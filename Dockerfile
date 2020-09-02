@@ -1,5 +1,4 @@
-# FROM tensorflow/tensorflow:2.0.0-gpu-py3 AS base
-FROM tensorflow/tensorflow:2.0.0-py3 AS base
+FROM volkherscholz/tensorflow-gdcm
 
 # install gdcm
 COPY . /dicomml

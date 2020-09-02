@@ -1,4 +1,4 @@
-name: build image
+name: test & build
 
 # Trigger on push
 on: push
