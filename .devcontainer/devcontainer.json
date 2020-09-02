@@ -1,0 +1,18 @@
+{
+	"name": "Dicomml",
+	"dockerComposeFile": [
+		"docker-compose.yaml"
+	],
+	"service": "develop",
+	"workspaceFolder": "/workspace",
+	"settings": {
+		"terminal.integrated.shell.linux": "/bin/bash"
+	},
+	"extensions": [
+		"eamodio.gitlens",
+		"ms-python.python",
+		"redhat.vscode-yaml"
+	],
+	// Install git & jupyter
+	"postCreateCommand": "apt-get update && apt-get install -y git ssh-client && pip install -r requirements.txt && pip install jupyter matplotlib flake8",
+}

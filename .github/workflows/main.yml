@@ -1,0 +1,41 @@
+name: build image
+
+# Trigger on push
+on: push
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    container: 
+      image: "volkherscholz/tensorflow-gdcm"
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: install
+      run: |
+        pip install --no-cache-dir -r requirements.txt
+        pip install flake8
+        pip install .
+    - name: lint
+      run: |
+        flake8 dicomml tests
+    - name: test
+      run: |
+        python -m unittest discover -s ./tests -p test_*.py
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Build and push Docker images
+      uses: docker/build-push-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUBUSER }}
+        password: ${{ secrets.DOCKERHUBTOKEN }}
+        repository: volkherscholz/dicomml
+        tag_with_ref: true
+        tag_with_sha: true
