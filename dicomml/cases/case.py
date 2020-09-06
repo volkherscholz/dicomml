@@ -1,7 +1,10 @@
 import os
 import glob
 import uuid
+from tempfile import mkdtemp
+from shutil import make_archive, unpack_archive
 import numpy as np
+import json
 #
 from pydicom.filereader import dcmread
 
@@ -25,6 +28,7 @@ class DicommlCase:
     def __init__(self,
                  caseid=None,
                  images: dict = {},
+                 images_metadata: dict = {},
                  rois: dict = {},
                  diagnose: dict = {},
                  images_to_diagnosis: dict = {},
@@ -34,6 +38,8 @@ class DicommlCase:
         self.caseid = caseid
         # dictionary of images
         self.images = images
+        # image metadata
+        self.images_metadata = images_metadata
         # dictionary of rois
         self.rois = rois
         # dictionary of diagnoses
@@ -42,12 +48,6 @@ class DicommlCase:
         self.images_to_diagnosis = images_to_diagnosis
         # dictionary linking images to rois
         self.images_to_rois = images_to_rois
-
-    def expand_images(self, method='rotation'):
-        """
-        expand images by adding transformed versions
-        Current implementation supports rotation
-        """
 
     def split(self, nimages=10):
         """
@@ -59,8 +59,65 @@ class DicommlCase:
         """
         Saves the current case as zip file
         """
-        file_path = os.path.join(path, self.caseid + '.zip')
+        tempfolder = mkdtemp()
+        _path = os.path.join(tempfolder, self.caseid)
+        with open(os.path.join(_path, 'meta.json'), 'w') as _f:
+            json.dumps(_f, {
+                'images_metadata': self.images_metadata,
+                'diagnose': self.diagnose,
+                'images_to_diagnosis': self.images_to_diagnosis,
+                'images_to_rois': self.images_to_rois
+            })
+        if len(self.images) > 0:
+            with open(os.path.join(_path, 'images.npz'), 'wb') as _f:
+                np.savez_compressed(_f, **self.images)
+        if len(self.rois) > 0:
+            with open(os.path.join(_path, 'rois.npz'), 'wb') as _f:
+                np.savez_compressed(_f, **self.rois)
+        file_path = os.path.join(path, self.caseid)
+        file_path = make_archive(
+            basename=file_path,
+            format='zip',
+            root_dir=tempfolder,
+            base_dir=self.caseid)
         return file_path
+
+    @classmethod
+    def load(cls, zipfile):
+        """
+        Load a case from a zipfile
+        """
+        tempfolder = mkdtemp()
+        unpack_archive(zipfile, tempfolder)
+        # assumes that the zipfile has a basepath
+        caseid = os.listdir(tempfolder)[0]
+        _path = os.path.join(tempfolder, caseid)
+        # load metadata
+        with open(os.path.join(_path, 'meta.json'), 'r') as _f:
+            _meta = json.loads(_f)
+        images_metadata = _meta['images_metadata']
+        diagnose = _meta['diagnose']
+        images_to_diagnosis = _meta['images_to_diagnosis']
+        images_to_rois = _meta['images_to_rois']
+        # load images
+        if os.path.isfile(os.path.join(_path, 'images.npz')):
+            with open(os.path.join(_path, 'images.npz'), 'rb') as _f:
+                images = np.load(_f)
+        else:
+            images = {}
+        if os.path.isfile(os.path.join(_path, 'rois.npz')):
+            with open(os.path.join(_path, 'images.npz'), 'rb') as _f:
+                rois = np.load(_f)
+        else:
+            rois = {}
+        return cls(
+            caseid=caseid,
+            images=images,
+            rois=rois,
+            images_metadata=images_metadata,
+            diagnose=diagnose,
+            images_to_diagnosis=images_to_diagnosis,
+            images_to_rois=images_to_rois)
 
     def export(self,
                includediagnoses=True,
@@ -75,6 +132,8 @@ class DicommlCase:
     def from_dicom_folder(cls,
                           path,
                           pattern='*',
+                          caseid=None,
+                          caseid_from_folder_name=True,
                           exlude_dicom_dir=True,
                           scale_to_hounsfield=True,
                           index_image='instanceNr'):
@@ -85,15 +144,18 @@ class DicommlCase:
         if exlude_dicom_dir:
             files = [_f for _f in files if _f != 'DICOMDIR']
         images = {}
+        images_metadata = {}
         for _f in files:
             metadata, _arr = cls._read_dicom(_f, scale_to_hounsfield)
             index = metadata.pop(index_image)
-            images.update({
-                index: {
-                    'metadata': metadata,
-                    'image': _arr
-                }})
-        return cls(images=images)
+            images.update({str(index): _arr})
+            images_metadata.update({str(index): metadata})
+        if caseid_from_folder_name:
+            caseid = os.path.basename(path)
+        return cls(
+            caseid=caseid,
+            images=images,
+            images_metadata=images_metadata)
 
     @staticmethod
     def _read_dicom(self, filename, scale_to_hounsfield):
