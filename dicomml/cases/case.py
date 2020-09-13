@@ -5,6 +5,7 @@ from tempfile import mkdtemp
 from shutil import make_archive, unpack_archive
 import numpy as np
 import json
+import pandas as pd
 #
 from pydicom.filereader import dcmread
 
@@ -48,6 +49,32 @@ class DicommlCase:
         self.images_to_diagnosis = images_to_diagnosis
         # dictionary linking images to rois
         self.images_to_rois = images_to_rois
+
+    def add_diagnose(self,
+                     diagnoses: pd.DataFrame,
+                     image_index_column: str = 'instanceNr',
+                     diagnose_column: str = 'keywords'):
+        """
+        Add diagnose information
+        structure of DataFrame:
+        - image_index_column: which image is meant
+        - diagnose_column: the diagnose (string)
+        """
+        # get unique diagnose labels
+        _diag_labels = sorted(diagnoses[diagnose_column].unique().tolist())
+        # get highest index for existing diagnose labels
+        _start_index = len(self.diagnose.keys())
+        # iterate over unique diagnoses
+        for i, diag_label in enumerate(_diag_labels):
+            i += _start_index
+            images = diagnoses[
+                diagnoses[diagnose_column] == diag_label][
+                    image_index_column].tolist()
+            for img in images:
+                if img in self.images_to_diagnoses.key():
+                    self.images_to_diagnoses[img].append(i)
+                else:
+                    self.images_to_diagnoses[img] = [i]
 
     def split(self, nimages=10):
         """
