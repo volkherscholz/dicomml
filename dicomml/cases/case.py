@@ -52,6 +52,7 @@ class DicommlCase:
 
     def add_diagnose(self,
                      diagnoses: pd.DataFrame,
+                     diagnose_labels: list,
                      image_index_column: str = 'instanceNr',
                      diagnose_column: str = 'keywords'):
         """
@@ -59,9 +60,10 @@ class DicommlCase:
         structure of DataFrame:
         - image_index_column: which image is meant
         - diagnose_column: the diagnose (string)
+        - diagnose_labels: list of unique labels
         """
         # get unique diagnose labels
-        _diag_labels = sorted(diagnoses[diagnose_column].unique().tolist())
+        _diag_labels = sorted(diagnose_labels)
         # get highest index for existing diagnose labels
         _start_index = len(self.diagnose.keys())
         # iterate over unique diagnoses
