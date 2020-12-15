@@ -1,8 +1,11 @@
 version: '3.4'
 services:
   develop:
-    image: volkherscholz/tensorflow-gdcm
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
     volumes:
       - ..:/workspace:cached
       - ../../dicomml-experimentation:/workspace/notebooks
+      - ../../dicomml-old:/workspace/old-cod
     command: /bin/sh -c "while sleep 1000; do :; done"
