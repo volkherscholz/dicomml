@@ -27,20 +27,28 @@ class AddRotatedImages(DicommlTransform):
         cases = [case]
         #
         for i in range(self.n_rotations):
-            for index, arr in case.images:
+            for index, arr in case.images.items():
                 angle = np.random.uniform(
                     low=self.lower_angle, high=self.upper_angle)
                 rotated_images.update({
-                    index: ndimage.rotate(arr, angle, reshape=False)
+                    index: ndimage.rotate(
+                        arr, angle,
+                        reshape=False,
+                        mode='constant',
+                        cval=-1000)
                 })
                 if index in case.images_to_rois.keys():
                     roi_index = case.images_to_rois[index]
                     roi = case.rois[roi_index]
                     rotated_rois.update({
-                        roi_index: ndimage.rotate(roi, angle, reshape=False)
+                        roi_index: ndimage.rotate(
+                            roi, angle,
+                            reshape=False,
+                            mode='constant',
+                            cval=0)
                     })
             cases.append(DicommlCase(
-                caseid=case.caseid + str(i + 1),
+                caseid='{}-{}'.format(case.caseid, str(i + 1)),
                 images=rotated_images,
                 rois=rotated_rois,
                 images_metadata=case.images_metadata,

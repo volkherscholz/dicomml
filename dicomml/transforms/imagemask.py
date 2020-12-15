@@ -29,10 +29,16 @@ class MaskImages(DicommlTransform):
         self.dilation_disk_size = dilation_disk_size
 
     def transform_case(self, case: DicommlCase) -> DicommlCase:
-        for index, arr in case.images:
-            case.images.update({
-                index: self._mask_image(arr)
-            })
+        return DicommlCase(
+            caseid=case.caseid,
+            images={
+                key: self._mask_image(arr)
+                for key, arr in case.images.items()},
+            images_metadata=case.images_metadata,
+            rois=case.rois,
+            diagnose=case.diagnose,
+            images_to_diagnosis=case.images_to_diagnosis,
+            images_to_rois=case.images_to_rois)
 
     def _mask_image(self, _arr):
         """

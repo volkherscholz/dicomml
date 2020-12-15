@@ -20,7 +20,7 @@ class CNNEncode(DicommlTransform):
         _input_shape = image_height, image_width, 3
         if cnn != 'inception':
             raise ValueError('Only inception supported so far')
-        cnn = tf.keras.applications.inception_v3.Inception
+        cnn = tf.keras.applications.InceptionV3
         self.cnn = cnn(
             include_top=False,
             weights='imagenet',
@@ -35,7 +35,9 @@ class CNNEncode(DicommlTransform):
     def transform_case(self, case: DicommlCase) -> DicommlCase:
         index_to_arr_i = {}
         arrs = []
-        for i, (index, arr) in enumerate(sorted(case.images)):
+        for i, (index, arr) in enumerate(sorted(case.images.items())):
+            if len(arr.shape) == 2:
+                arr = arr[..., np.newaxis]
             arrs.append(arr)
             index_to_arr_i.update({index: i})
         imgarrays = np.array_split(
