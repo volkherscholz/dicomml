@@ -1,18 +1,22 @@
 from typing import List, Union
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
+import logging
 #
 from dicomml.cases.case import DicommlCase
 
 
-class DicommlTransform(ABCMeta):
+class DicommlTransform(ABC):
     """
     Base class of all transformations. A transformation is
     an operation which takes a list of cases and returns a
     possible longer list of cases.
     """
 
-    def __init__(self, name):
+    def __init__(self, name: Union[str, None] = None):
+        if name is None:
+            name = self.__class__.__name__
         self.name = name
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def transform(self, cases: List[DicommlCase]) -> List[DicommlCase]:
         transformed_cases = []
@@ -29,3 +33,13 @@ class DicommlTransform(ABCMeta):
                        case: DicommlCase) -> Union[
                            DicommlCase, List[DicommlCase]]:
         pass
+
+    def __call__(self,
+                 cases: Union[DicommlCase, List[DicommlCase]]
+                 ) -> Union[DicommlCase, List[DicommlCase]]:
+        if isinstance(cases, list):
+            return self.transform(cases)
+        elif isinstance(cases, DicommlCase):
+            return self.transform_case(cases)
+        else:
+            self.logger.error('Input is neither a case nor a list of cases')
