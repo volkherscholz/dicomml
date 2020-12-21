@@ -9,51 +9,39 @@ from dicomml.cases.case import DicommlCase
 class AddRotatedImages(DicommlTransform):
 
     def __init__(self,
-                 lower_angle=-45,
-                 upper_angle=45,
-                 n_rotations=1,
+                 lower_angle: float = -45.0,
+                 upper_angle: float = 45.0,
+                 n_rotations: int = 1,
+                 fill_value: float = 0.,
                  **kwargs):
         super(AddRotatedImages, self).__init__(**kwargs)
         self.lower_angle = lower_angle
         self.upper_angle = upper_angle
         self.n_rotations = n_rotations
+        self.fill_value = fill_value
 
     def transform_case(self, case: DicommlCase) -> List[DicommlCase]:
         """
         Expand images by adding transformed versions
         """
-        rotated_images = {}
-        rotated_rois = {}
         cases = [case]
         #
         for i in range(self.n_rotations):
-            for index, arr in case.images.items():
-                angle = np.random.uniform(
-                    low=self.lower_angle, high=self.upper_angle)
-                rotated_images.update({
-                    index: ndimage.rotate(
-                        arr, angle,
-                        reshape=False,
-                        mode='constant',
-                        cval=-1000)
-                })
-                if index in case.images_to_rois.keys():
-                    roi_index = case.images_to_rois[index]
-                    roi = case.rois[roi_index]
-                    rotated_rois.update({
-                        roi_index: ndimage.rotate(
-                            roi, angle,
-                            reshape=False,
-                            mode='constant',
-                            cval=0)
-                    })
             cases.append(DicommlCase(
                 caseid='{}-{}'.format(case.caseid, str(i + 1)),
-                images=rotated_images,
-                rois=rotated_rois,
+                images={
+                    key: self._rotate_image(arr)
+                    for key, arr in case.images.items()},
                 images_metadata=case.images_metadata,
+                rois={
+                    key: self._rotate_image(arr)
+                    for key, arr in case.rois.items()},
                 diagnose=case.diagnose,
                 images_to_diagnosis=case.images_to_diagnosis,
-                images_to_rois=case.images_to_rois
-            ))
+                images_to_rois=case.images_to_rois))
         return cases
+    
+    def _rotate_image(self, array):
+        angle = np.random.uniform(low=self.lower_angle, high=self.upper_angle)
+        return ndimage.rotate(
+            array, angle, reshape=False, mode='constant', cval=self.fill_value)

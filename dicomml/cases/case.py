@@ -6,6 +6,7 @@ from shutil import make_archive, unpack_archive, rmtree
 import numpy as np
 import json
 import pandas as pd
+import copy
 
 from typing import Union, List, Iterator, Tuple, Dict
 import matplotlib.pyplot as plt
@@ -42,17 +43,17 @@ class DicommlCase:
             caseid = str(uuid.uuid4())
         self.caseid = caseid
         # dictionary of images
-        self.images = images
+        self.images = copy.deepcopy(images)
         # image metadata
-        self.images_metadata = images_metadata
+        self.images_metadata = copy.deepcopy(images_metadata)
         # dictionary of rois
-        self.rois = rois
+        self.rois = copy.deepcopy(rois)
         # dictionary of diagnoses
-        self.diagnose = diagnose
+        self.diagnose = copy.deepcopy(diagnose)
         # dictionary linking images & diagnosis
-        self.images_to_diagnosis = images_to_diagnosis
+        self.images_to_diagnosis = copy.deepcopy(images_to_diagnosis)
         # dictionary linking images to rois
-        self.images_to_rois = images_to_rois
+        self.images_to_rois = copy.deepcopy(images_to_rois)
 
     def copy(self) -> 'DicommlCase':
         return type(self)(
@@ -97,16 +98,16 @@ class DicommlCase:
         else:
             new_obj = self.copy()
 
-        for (imgkey, _), roidata in rois.items():
-            roikey = str(uuid.uuid4())
+        for (imgkey, roinumber), roidata in rois.items():
+            roikey = '{}-{}'.format(imgkey, roinumber)
             if isinstance(imgkey, float):
                 imgkey = round(imgkey, 2)
             new_obj.rois.update({
                 roikey: construct_roi(
-                    image_shape=self.images[imgkey].shape,
+                    image_shape=new_obj.images[imgkey].shape,
                     x_coord=roidata[x_coord_column],
                     y_coord=roidata[y_coord_column])})
-            if imgkey in self.images_to_rois.keys():
+            if imgkey in new_obj.images_to_rois.keys():
                 new_obj.images_to_rois[imgkey].append(roikey)
             else:
                 new_obj.images_to_rois.update({imgkey: [roikey]})
@@ -138,7 +139,7 @@ class DicommlCase:
                 diagnoses[diagnose_column] == diag_label][
                     image_index_column].tolist()
             for img in images:
-                if img in self.images_to_diagnoses.key():
+                if img in new_obj.images_to_diagnoses.key():
                     new_obj.images_to_diagnoses[img].append(diagkey)
                 else:
                     new_obj.images_to_diagnoses.update({img: [diagkey]})
