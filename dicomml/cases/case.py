@@ -7,7 +7,7 @@ import numpy as np
 import json
 import pandas as pd
 
-from typing import Union, List, Iterator, Tuple
+from typing import Union, List, Iterator, Tuple, Dict
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
@@ -54,11 +54,22 @@ class DicommlCase:
         # dictionary linking images to rois
         self.images_to_rois = images_to_rois
 
+    def copy(self) -> 'DicommlCase':
+        return type(self)(
+            caseid=self.caseid,
+            images=self.images,
+            images_metadata=self.images_metadata,
+            rois=self.rois,
+            diagnose=self.diagnose,
+            images_to_diagnosis=self.images_to_diagnosis,
+            images_to_rois=self.images_to_rois)
+
     def add_rois(self,
                  rois: pd.DataFrame,
                  rois_index_column: List[str] = ['z_coordinate', 'RoiNo'],
                  x_coord_column: str = 'x_coordinate',
-                 y_coord_column: str = 'y_coordinate'):
+                 y_coord_column: str = 'y_coordinate',
+                 inplace: bool = False) -> 'DicommlCase':
         """
         Add roi information
         Args:
@@ -81,25 +92,32 @@ class DicommlCase:
                 points, z_values, grid, method='cubic', fill_value=0.)
             return interp.transpose()
 
+        if inplace:
+            new_obj = self
+        else:
+            new_obj = self.copy()
+
         for (imgkey, _), roidata in rois.items():
             roikey = str(uuid.uuid4())
             if isinstance(imgkey, float):
                 imgkey = round(imgkey, 2)
-            self.rois.update({
+            new_obj.rois.update({
                 roikey: construct_roi(
                     image_shape=self.images[imgkey].shape,
                     x_coord=roidata[x_coord_column],
                     y_coord=roidata[y_coord_column])})
             if imgkey in self.images_to_rois.keys():
-                self.images_to_rois[imgkey].append(roikey)
+                new_obj.images_to_rois[imgkey].append(roikey)
             else:
-                self.images_to_rois.update({imgkey: [roikey]})
+                new_obj.images_to_rois.update({imgkey: [roikey]})
+        return new_obj
 
     def add_diagnose(self,
                      diagnoses: pd.DataFrame,
                      diagnose_labels: list,
                      image_index_column: str = 'instanceNr',
-                     diagnose_column: str = 'keywords'):
+                     diagnose_column: str = 'keywords',
+                     inplace: bool = False) -> 'DicommlCase':
         """
         Add diagnose information
         structure of DataFrame:
@@ -107,21 +125,26 @@ class DicommlCase:
         - diagnose_column: the diagnose (string)
         - diagnose_labels: list of unique labels
         """
+        if inplace:
+            new_obj = self
+        else:
+            new_obj = self.copy()
         # get unique diagnose labels
         _diag_labels = sorted(diagnoses[diagnose_column].unique().tolist())
         for diag_label in _diag_labels:
             diagkey = str(uuid.uuid4())
-            self.diagnose.update({diagkey: diag_label})
+            new_obj.diagnose.update({diagkey: diag_label})
             images = diagnoses[
                 diagnoses[diagnose_column] == diag_label][
                     image_index_column].tolist()
             for img in images:
                 if img in self.images_to_diagnoses.key():
-                    self.images_to_diagnoses[img].append(diagkey)
+                    new_obj.images_to_diagnoses[img].append(diagkey)
                 else:
-                    self.images_to_diagnoses.update({img: [diagkey]})
+                    new_obj.images_to_diagnoses.update({img: [diagkey]})
+        return new_obj
 
-    def save(self, path: str = '.'):
+    def save(self, path: str = '.') -> str:
         """
         Saves the current case as zip file
         """
@@ -152,7 +175,7 @@ class DicommlCase:
         return file_path
 
     @classmethod
-    def load(cls, zipfile):
+    def load(cls, zipfile) -> 'DicommlCase':
         """
         Load a case from a zipfile
         """
@@ -198,7 +221,8 @@ class DicommlCase:
                include_diagnoses: bool = True,
                diagnose_label_set: List[str] = [],
                include_rois: bool = True,
-               order_images_with_index: bool = True):
+               order_images_with_index: bool = True
+               ) -> Dict[str, np.ndarray]:
         """
         Exports the case for training or inference as dictionary
         holding arrays with images, rois and one-hot encoded labels
@@ -289,13 +313,13 @@ class DicommlCase:
 
     @classmethod
     def from_dicom_folder(cls,
-                          path,
-                          pattern='**',
-                          caseid=None,
-                          caseid_from_folder_name=True,
-                          exlude_dicom_dir=True,
-                          scale_to_hounsfield=True,
-                          index_image='z_coordinate',
+                          path: str,
+                          pattern: str = '**',
+                          caseid: Union[str, None] = None,
+                          caseid_from_folder_name: bool = True,
+                          exlude_dicom_dir: bool = True,
+                          scale_to_hounsfield: bool = True,
+                          index_image: str = 'z_coordinate',
                           delete_folder: bool = False):
         """
         Create a case from a folder of dicom images
@@ -315,8 +339,6 @@ class DicommlCase:
             images_metadata.update({index: metadata})
         if caseid_from_folder_name:
             caseid = os.path.basename(path)
-        else:
-            caseid = None
         if delete_folder:
             rmtree(path)
         return cls(
