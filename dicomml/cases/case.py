@@ -6,7 +6,7 @@ from shutil import make_archive, unpack_archive, rmtree
 import numpy as np
 import json
 import pandas as pd
-from typing import Union, List
+from typing import Union, List, Iterator, Tuple
 #
 from pydicom.filereader import dcmread
 
@@ -117,42 +117,6 @@ class DicommlCase:
                     self.images_to_diagnoses[img].append(diagkey)
                 else:
                     self.images_to_diagnoses.update({img: [diagkey]})
-
-    def split(self,
-              nimages=10,
-              order_images_with_index: bool = True) -> List['DicommlCase']:
-        """
-        Split the current case into multiple cases,
-        each having nimages of images
-        """
-        if order_images_with_index:
-            image_keys = sorted(self.images.keys())
-        else:
-            image_keys = self.images.keys()
-        image_groups = [
-            list(image_keys)[i:i + nimages]
-            for i in range(0, len(image_keys), nimages)]
-        return [self.__class__(
-            images={img: self.images[img] for img in group},
-            images_metadata={img: self.images_metadata[img]
-                for img in group if img in self.images_metadata.keys()},
-            rois={
-                roikey: roi for roikey, roi in self.rois.items()
-                if roikey in [
-                    _key for img in group
-                    for _key in self.images_to_rois[img]]},
-            diagnose={
-                diagkey: diag for diagkey, diag in self.diagnose.items()
-                if diagkey in [
-                    _key for img in group
-                    for _key in self.images_to_diagnosis[img]]},
-            images_to_diagnosis={
-                img: self.images_to_diagnosis[img]
-                for img in group if img in self.images_to_diagnosis.keys()},
-            images_to_rois={
-                img: self.images_to_rois[img]
-                for img in group if img in self.images_to_rois.keys()}
-            ) for group in image_groups]
 
     def save(self, path: str = '.'):
         """
@@ -276,6 +240,27 @@ class DicommlCase:
         if include_rois:
             data.update(dict(rois=np.array(_roi_array)))
         return data
+
+    def iterate(self) -> Iterator[Tuple[str, np.ndarray, str]]:
+        """
+        Return images overlayed with rois (if present)
+        and labels (if present)
+        """
+        image_keys = iter(sorted(self.images.keys()))
+        while True:
+            image_key = next(image_keys)
+            image = self.images[image_key]
+            if image_key in self.images_to_rois.keys():
+                image = image + np.array(sum([
+                    self.rois[_key]
+                    for _key in self.images_to_rois[image_key]]))
+            if image_key in self.images_to_diagnosis.keys():
+                labels = 'Labels: {}'.format(' '.join([
+                    self.diagnose[_key]
+                    for _key in self.images_to_diagnosis[image_key]]))
+            else:
+                labels = 'No labels'
+            yield str(image_key), image, labels
 
     @classmethod
     def from_dicom_folder(cls,
