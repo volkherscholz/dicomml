@@ -315,6 +315,8 @@ class DicommlCase:
             images_metadata.update({index: metadata})
         if caseid_from_folder_name:
             caseid = os.path.basename(path)
+        else:
+            caseid = None
         if delete_folder:
             rmtree(path)
         return cls(
@@ -331,7 +333,10 @@ class DicommlCase:
         tempfolder = mkdtemp()
         unpack_archive(zipfile, tempfolder, format='zip')
         return cls.from_dicom_folder(
-            tempfolder, delete_folder=True, **kwargs)
+            tempfolder,
+            caseid_from_folder_name=False,
+            delete_folder=True,
+            **kwargs)
 
     @staticmethod
     def _read_dicom(filename, scale_to_hounsfield: bool = True):

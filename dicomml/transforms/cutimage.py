@@ -24,7 +24,9 @@ class CutImages(DicommlTransform):
                 key: self._cut_image(arr)
                 for key, arr in case.images.items()},
             images_metadata=case.images_metadata,
-            rois=case.rois,
+            rois={
+                key: self._cut_image(arr)
+                for key, arr in case.rois.items()},
             diagnose=case.diagnose,
             images_to_diagnosis=case.images_to_diagnosis,
             images_to_rois=case.images_to_rois)
