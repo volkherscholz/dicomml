@@ -22,7 +22,7 @@ class DicommlTransform(ABC):
         transformed_cases = []
         for case in cases:
             output = self.transform_case(case)
-            if type(output) == list:
+            if isinstance(output, list):
                 transformed_cases = transformed_cases + output
             else:
                 transformed_cases.append(output)
@@ -34,12 +34,5 @@ class DicommlTransform(ABC):
                            DicommlCase, List[DicommlCase]]:
         pass
 
-    def __call__(self,
-                 cases: Union[DicommlCase, List[DicommlCase]]
-                 ) -> Union[DicommlCase, List[DicommlCase]]:
-        if isinstance(cases, list):
-            return self.transform(cases)
-        elif isinstance(cases, DicommlCase):
-            return self.transform_case(cases)
-        else:
-            self.logger.error('Input is neither a case nor a list of cases')
+    def __call__(self, cases: List[DicommlCase]) -> List[DicommlCase]:
+        return self.transform(cases)

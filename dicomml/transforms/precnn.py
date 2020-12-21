@@ -26,8 +26,7 @@ class CNNEncode(DicommlTransform):
             weights='imagenet',
             input_tensor=None,
             input_shape=_input_shape,
-            pooling=None
-        )
+            pooling=None)
         self.cnn.trainable = False
         self.normalize_images = normalize_images
         self.n_images_batch = n_images_batch
