@@ -6,8 +6,11 @@ from shutil import make_archive, unpack_archive, rmtree
 import numpy as np
 import json
 import pandas as pd
+
 from typing import Union, List, Iterator, Tuple
-#
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+
 from pydicom.filereader import dcmread
 
 
@@ -222,18 +225,24 @@ class DicommlCase:
         # iterate
         for imgkey in image_keys:
             _image_array.append(self.images[imgkey])
-            _rois = np.array(sum([
-                self.rois[_key] for _key in self.images_to_rois[imgkey]
-                if imgkey in self.images_to_rois.keys()]))
-            # restict to maximal value of 1 if multiple rois overlay
-            _roi_array.append(np.where(_rois > 1., 1., _rois))
-            _diagnose_labels_img = [
-                self.diagnose[_key]
-                for _key in self.images_to_diagnosis[imgkey]
-                if imgkey in self.images_to_diagnosis.keys()]
-            _diagnose_array.append([
-                1. if diagnose in _diagnose_labels_img else 0.
-                for diagnose in diagnose_label_set])
+            if imgkey in self.images_to_rois.keys():
+                _rois = np.array(sum([
+                    self.rois[_key] for _key in self.images_to_rois[imgkey]]))
+                # restict to maximal value of 1 if multiple rois overlay
+                _roi_array.append(np.where(_rois > 1., 1., _rois))
+            else:
+                # zero rois
+                _roi_array.append(np.zeros(self.images[imgkey].shape))
+            if imgkey in self.images_to_diagnosis.keys():
+                _diagnose_labels_img = [
+                    self.diagnose[_key]
+                    for _key in self.images_to_diagnosis[imgkey]]
+                _diagnose_array.append([
+                    1. if diagnose in _diagnose_labels_img else 0.
+                    for diagnose in diagnose_label_set])
+            else:
+                # zero diagnose
+                _diagnose_array.append(np.zeros(len(diagnose_label_set)))
         data = dict(images=np.array(_image_array))
         if include_diagnoses:
             data.update(dict(labels=np.array(_diagnose_array)))
@@ -248,19 +257,35 @@ class DicommlCase:
         """
         image_keys = iter(sorted(self.images.keys()))
         while True:
-            image_key = next(image_keys)
-            image = self.images[image_key]
-            if image_key in self.images_to_rois.keys():
-                image = image + np.array(sum([
-                    self.rois[_key]
-                    for _key in self.images_to_rois[image_key]]))
-            if image_key in self.images_to_diagnosis.keys():
-                labels = 'Labels: {}'.format(' '.join([
-                    self.diagnose[_key]
-                    for _key in self.images_to_diagnosis[image_key]]))
-            else:
-                labels = 'No labels'
-            yield str(image_key), image, labels
+            try:
+                image_key = next(image_keys)
+                image = self.images[image_key]
+                if image_key in self.images_to_rois.keys():
+                    image = image + np.array(sum([
+                        self.rois[_key]
+                        for _key in self.images_to_rois[image_key]]))
+                if image_key in self.images_to_diagnosis.keys():
+                    labels = 'Labels: {}'.format(' '.join([
+                        self.diagnose[_key]
+                        for _key in self.images_to_diagnosis[image_key]]))
+                else:
+                    labels = 'No labels'
+                yield str(image_key), image, labels
+            except StopIteration:
+                return
+
+    def visualize(self, fig, ax) -> Figure:
+        contents = list(self.iterate())
+
+        from ipywidgets import interact
+        from IPython.display import display
+
+        def slider(slice):
+            ax.imshow(contents[slice][1], cmap=plt.cm.gray)
+            fig.canvas.draw()
+            display(fig)
+
+        return interact(slider, slice=(0, len(contents) - 1))
 
     @classmethod
     def from_dicom_folder(cls,
