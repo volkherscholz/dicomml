@@ -1,4 +1,4 @@
-FROM volkherscholz/tensorflow-gdcm
+FROM volkherscholz/tensorflow-gdcm:tf-2.4.0-gpu
 
 # install gdcm
 COPY . /dicomml
