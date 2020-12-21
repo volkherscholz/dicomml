@@ -250,7 +250,9 @@ class DicommlCase:
             data.update(dict(rois=np.array(_roi_array)))
         return data
 
-    def iterate(self) -> Iterator[Tuple[str, np.ndarray, str]]:
+    def iterate(self,
+                add_rois: bool = True,
+                add_labels: bool = True) -> Iterator[Tuple[str, np.ndarray, str]]:
         """
         Return images overlayed with rois (if present)
         and labels (if present)
@@ -260,11 +262,11 @@ class DicommlCase:
             try:
                 image_key = next(image_keys)
                 image = self.images[image_key]
-                if image_key in self.images_to_rois.keys():
+                if image_key in self.images_to_rois.keys() and add_rois:
                     image = image + np.array(sum([
                         self.rois[_key]
                         for _key in self.images_to_rois[image_key]]))
-                if image_key in self.images_to_diagnosis.keys():
+                if image_key in self.images_to_diagnosis.keys() and add_labels:
                     labels = 'Labels: {}'.format(' '.join([
                         self.diagnose[_key]
                         for _key in self.images_to_diagnosis[image_key]]))
@@ -274,8 +276,8 @@ class DicommlCase:
             except StopIteration:
                 return
 
-    def visualize(self, fig, ax) -> Figure:
-        contents = list(self.iterate())
+    def visualize(self, fig, ax, **kwargs) -> Figure:
+        contents = list(self.iterate(**kwargs))
 
         from ipywidgets import interact
         from IPython.display import display
