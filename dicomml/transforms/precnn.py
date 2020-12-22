@@ -48,11 +48,16 @@ class CNNEncode(DicommlTransform):
             _out.append(self._apply_cnn(imgarray))
         transformed_array = np.concatenate(_out, axis=0)
         # turn into dictionary again
-        case.images = {
-            index: transformed_array[i, ...]
-            for index, i in index_to_arr_i.items()
-        }
-        return case
+        return DicommlCase(
+            caseid=case.caseid,
+            images={
+                index: transformed_array[i, ...]
+                for index, i in index_to_arr_i.items()},
+            images_metadata=case.images_metadata,
+            rois=case.rois,
+            diagnose=case.diagnose,
+            images_to_diagnosis=case.images_to_diagnosis,
+            images_to_rois=case.images_to_rois)
 
     def _apply_cnn(self, arr):
         if self.normalize_images:

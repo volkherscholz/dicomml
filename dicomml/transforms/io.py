@@ -1,0 +1,77 @@
+import os
+import glob
+from typing import Union, List, Dict
+
+from dicomml.transforms.transform import DicommlTransform
+from dicomml.cases.case import DicommlCase
+
+
+class Load(DicommlTransform):
+    """
+    Load DicommlCases from folder
+    """
+
+    def __init__(self,
+                 load_from_dicom: bool = False,
+                 load_config: dict = dict(),
+                 filename_pattern: str = '*.zip',
+                 **kwargs):
+        super(Load).__init__(**kwargs)
+        self.load_from_dicom = load_from_dicom
+        self.load_config = load_config
+        self.filename_pattern = filename_pattern
+
+    def __call__(self, folder: str = '.') -> List[DicommlCase]:
+        files = glob.glob(os.path.join(folder, self.filename_pattern))
+        if self.load_from_dicom:
+            cases = [
+                DicommlCase.from_dicom_zipfile(_file, **self.load_config)
+                for _file in files]
+        else:
+            cases = [
+                DicommlCase.load(_file)
+                for _file in files]
+        return cases
+
+
+class Save(DicommlTransform):
+    """
+    Load DicommlCases from folder
+    """
+
+    def __init__(self,
+                 split_ratios: Union[Dict[str, float], None] = None,
+                 **kwargs):
+        super(Load).__init__(**kwargs)
+        self.split_ratios = split_ratios
+
+    def __call__(self,
+                 cases: List[DicommlCase],
+                 folder: str = '.') -> Dict[str, str]:
+        if self.split_ratios is None:
+            files = {
+                folder: [case.save(folder) for case in cases]}
+        else:
+            files = {}
+            for name, cases in self.split_case_list(cases):
+                folder_name = os.path.join(folder, name)
+                for case in cases:
+                    case.save(folder_name)
+                files.update({name: folder_name})
+        return files
+
+    def split_case_list(self, cases):
+        if sum(self.split_ratios) != 1:
+            raise ValueError('Split ratios have to add up to one.')
+        casesets = dict()
+        _prev_ratio = 0
+        for name, ratio in self.split_ratios.items():
+            _lower_index = int(_prev_ratio * len(cases))
+            _upper_index = int((_prev_ratio + ratio) * len(cases))
+            casesets.update({name: cases[_lower_index:_upper_index]})
+            _prev_ratio = ratio
+        # add remaining cases to last dataset
+        if _upper_index < len(cases):
+            casesets[list(casesets.keys())[-1]].append(
+                cases[_upper_index:])
+        return casesets

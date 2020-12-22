@@ -40,7 +40,7 @@ class AddRotatedImages(DicommlTransform):
                 images_to_diagnosis=case.images_to_diagnosis,
                 images_to_rois=case.images_to_rois))
         return cases
-    
+
     def _rotate_image(self, array):
         angle = np.random.uniform(low=self.lower_angle, high=self.upper_angle)
         return ndimage.rotate(
