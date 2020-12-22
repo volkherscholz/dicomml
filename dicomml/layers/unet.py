@@ -1,8 +1,6 @@
 from typing import Union
 
-
 import tensorflow as tf
-
 
 from dicomml.layers.wrappers import SliceDistributed, ImageDistributed
 
@@ -61,9 +59,10 @@ class UNETDownSampleBlock(tf.keras.Layer):
                  pool_size: int = 2,
                  dropoutrate: float = 0.1,
                  pool_three_dimensional: bool = False,
-                 conv_block: dict = dict(),
+                 conv_block: Union[dict, None] = None,
                  **kwargs):
         super(UNETDownSampleBlock, self).__init__(**kwargs)
+        conv_block = conv_block or {}
         conv_block.update(dict(n_filters=n_filters))
         self.conv_layers = [
             UNETConvBlock(**conv_block),
@@ -91,10 +90,11 @@ class UNETUpSampleBlock(tf.keras.Layer):
                  n_filters: int = 16,
                  stride_size: int = 2,
                  dropoutrate: float = 0.1,
-                 conv_block: dict = dict(),
+                 conv_block: Union[dict, None] = None,
                  conv_three_dimensional: bool = False,
                  **kwargs):
         super(UNETUpSampleBlock, self).__init__(**kwargs)
+        conv_block = conv_block or {}
         conv_block.update(dict(n_filters=n_filters))
         kernel_size = conv_block.get('kernel_size', 3)
         kernel_initializer = conv_block.get('kernel_initializer', 'he_normal')

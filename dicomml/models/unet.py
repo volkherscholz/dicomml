@@ -1,5 +1,6 @@
-import tensorflow as tf
+from typing import Union
 
+import tensorflow as tf
 
 from dicomml.layers.unet import \
     UNETDownSampleBlock, UNETUpSampleBlock, UNETConvBlock
@@ -18,10 +19,11 @@ class UNETModel(tf.keras.Model):
                  dropoutrate: float = 0.1,
                  pool_three_dimensional: bool = False,
                  conv_three_dimensional: bool = False,
-                 conv_block: dict = dict(),
+                 conv_block: Union[dict, None] = None,
                  conv_block_three_dimensional: bool = False,
                  **kwargs):
         super(UNETModel, self).__init__(**kwargs)
+        conv_block = conv_block or {}
         if conv_block_three_dimensional:
             conv_block.update(dict(three_dimensional=True))
         self.downsampling_blocks = [
