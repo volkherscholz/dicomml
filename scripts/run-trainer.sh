@@ -1,1 +1,0 @@
-python -m dicomml.trainer.main

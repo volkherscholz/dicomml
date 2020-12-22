@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+
 setup(
     # Application name:
     name="dicomml",
@@ -9,7 +10,7 @@ setup(
     author="Volkher Scholz",
     author_email="volkher.scholz@gmail.com",
     # Packages
-    packages=find_packages(exclude=['examples', 'tests*', 'configs']),
+    packages=find_packages(exclude=['examples', 'tests*']),
     # Dependencies
     install_requires=['numpy',
                       'pydicom',
@@ -17,11 +18,10 @@ setup(
                       'scipy',
                       'scikit-image',
                       'pyyaml'],
-    # scripts
-    scripts=['scripts/run-trainer.sh'],
+    entry_points={
+        'console_scripts': ['dicomml=dicomml.tasks.main:main']},
     # Details
     url="https://github.com/volkherscholz/dicomml",
     license="LICENSE",
     description="Machine Learning with medical images",
-    long_description=open("README.md").read(),
-)
+    long_description=open("README.md").read())
