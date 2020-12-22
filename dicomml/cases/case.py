@@ -6,7 +6,6 @@ from shutil import make_archive, unpack_archive, rmtree
 import numpy as np
 import json
 import pandas as pd
-import copy
 
 from typing import Union, List, Iterator, Tuple, Dict
 import matplotlib.pyplot as plt
@@ -33,27 +32,27 @@ class DicommlCase:
 
     def __init__(self,
                  caseid: Union[str, None] = None,
-                 images: dict = {},
-                 images_metadata: dict = {},
-                 rois: dict = {},
-                 diagnose: dict = {},
-                 images_to_diagnosis: dict = {},
-                 images_to_rois: dict = {}):
+                 images: Union[dict, None] = None,
+                 images_metadata: Union[dict, None] = None,
+                 rois: Union[dict, None] = None,
+                 diagnose: Union[dict, None] = None,
+                 images_to_diagnosis: Union[dict, None] = None,
+                 images_to_rois: Union[dict, None] = None):
         if caseid is None:
             caseid = str(uuid.uuid4())
         self.caseid = caseid
         # dictionary of images
-        self.images = copy.deepcopy(images)
+        self.images = images or {}
         # image metadata
-        self.images_metadata = copy.deepcopy(images_metadata)
+        self.images_metadata = images_metadata or {}
         # dictionary of rois
-        self.rois = copy.deepcopy(rois)
+        self.rois = rois or {}
         # dictionary of diagnoses
-        self.diagnose = copy.deepcopy(diagnose)
+        self.diagnose = diagnose or {}
         # dictionary linking images & diagnosis
-        self.images_to_diagnosis = copy.deepcopy(images_to_diagnosis)
+        self.images_to_diagnosis = images_to_diagnosis or {}
         # dictionary linking images to rois
-        self.images_to_rois = copy.deepcopy(images_to_rois)
+        self.images_to_rois = images_to_rois or {}
 
     def copy(self) -> 'DicommlCase':
         return type(self)(
@@ -277,7 +276,8 @@ class DicommlCase:
 
     def iterate(self,
                 add_rois: bool = True,
-                add_labels: bool = True) -> Iterator[Tuple[str, np.ndarray, str]]:
+                add_labels: bool = True
+                ) -> Iterator[Tuple[str, np.ndarray, str]]:
         """
         Return images overlayed with rois (if present)
         and labels (if present)
