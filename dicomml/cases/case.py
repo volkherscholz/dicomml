@@ -267,11 +267,11 @@ class DicommlCase:
             else:
                 # zero diagnose
                 _diagnose_array.append(np.zeros(len(diagnose_label_set)))
-        data = dict(images=np.array(_image_array))
+        data = dict(images=np.expand_dims(_image_array, axis=-1))
         if include_diagnoses:
             data.update(dict(labels=np.array(_diagnose_array)))
         if include_rois:
-            data.update(dict(rois=np.array(_roi_array)))
+            data.update(dict(rois=np.expand_dims(_roi_array, -1)))
         return data
 
     def iterate(self,
