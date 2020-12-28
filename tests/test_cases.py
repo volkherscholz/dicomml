@@ -3,7 +3,7 @@ import tempfile
 
 from dicomml.cases.case import DicommlCase
 
-from . import sample_case_config
+from tests import sample_case_config
 
 
 class TestDicommlCase(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestDicommlCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_folder:
             zipfile = case.save(path=temp_folder)
             case_loaded = DicommlCase.load(zipfile)
-        self.assertEqual(case.caseid, case_loaded.caseid)
+        self.assertEqual(case, case_loaded)
 
     def test_export(self):
         case = DicommlCase(**sample_case_config())

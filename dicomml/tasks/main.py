@@ -10,7 +10,7 @@ def run_task(name: Union[str, None] = None,
              task_class: Union[str, DicommlTask] = DicommlTask,
              config: Union[dict, None] = None,
              parallel_configs: Union[List[dict], None] = None
-             ) -> List[dict]:
+             ) -> dict:
     if isinstance(task_class, str):
         Task = dicomml_resolve(task_class)
     else:
@@ -20,12 +20,14 @@ def run_task(name: Union[str, None] = None,
             '{name}-{i}'.format(name=name, i=i): {**config, **cfg}
             for i, cfg in enumerate(parallel_configs)}
         tasks = [
-            ray.remote(Task).options(name=name).remote(name=name, **cfg)
+            ray.remote(Task).options(name=name).remote(name=name, config=cfg)
             for name, cfg in parallel_configs.items()]
         results = ray.get([task.run.remote() for task in tasks])
     else:
-        results = [Task(**config).run()]
-    return results
+        results = [Task(config=config).run()]
+    # combine results
+    return {
+        key: val for res in results for key, val in res.items()}
 
 
 def run_pipeline(ray_config: dict = dict(),

@@ -1,6 +1,7 @@
 import numpy as np
-from typing import List, Type, Dict
-#
+from typing import List, Type, Dict, Union
+
+from dicomml import resolve as dicomml_resolve
 from dicomml.transforms import DicommlTransform, ArrayTransform
 from dicomml.cases.case import DicommlCase
 
@@ -34,7 +35,8 @@ class Split(DicommlTransform):
                 image_groups = image_groups[:-1]
         # collect images etc by group
         case_configs = []
-        for group in image_groups:
+        for i, group in enumerate(image_groups):
+            caseid = '{case}-split-{i}'.format(case=case.caseid, i=i)
             images = {}
             images_metadata = {}
             rois = {}
@@ -60,6 +62,7 @@ class Split(DicommlTransform):
                         for key, val in case.rois.items()
                         if key in roi_keys_for_image})
             case_configs.append(dict(
+                caseid=caseid,
                 images=images,
                 images_metadata=images_metadata,
                 rois=rois,
@@ -72,11 +75,15 @@ class Split(DicommlTransform):
 class AddTranforms(DicommlTransform):
 
     def __init__(self,
-                 base_transform: Type[ArrayTransform],
+                 base_transform: Union[Type[ArrayTransform], str],
                  base_config: dict = dict(),
                  value_ranges: Dict[str, tuple] = dict(),
                  n_applications: int = 1,
                  **kwargs):
+        if isinstance(base_transform, str):
+            Transform = dicomml_resolve(base_transform)
+        else:
+            Transform = base_transform
         transform_configs = []
         for _ in range(n_applications):
             random_config = {
@@ -86,13 +93,15 @@ class AddTranforms(DicommlTransform):
                 **base_config,
                 **random_config})
         self.random_instances = [
-            base_transform(**cfg) for cfg in transform_configs]
+            Transform(**cfg) for cfg in transform_configs]
 
     def transform_case(self, case: DicommlCase) -> List[DicommlCase]:
         """
         Expand images by adding transformed versions
         """
         cases = [case]
-        for transform in self.random_instances:
-            cases.append(transform([case])[0])
+        for i, transform in enumerate(self.random_instances):
+            new_case = transform([case])[0]
+            new_case.caseid = '{case}-{i}'.format(case=case.caseid, i=i)
+            cases.append(new_case)
         return cases

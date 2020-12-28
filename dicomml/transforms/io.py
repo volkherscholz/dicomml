@@ -2,7 +2,7 @@ import os
 import glob
 from typing import Union, List, Dict
 
-from dicomml.transforms.transform import DicommlTransform
+from dicomml.transforms import DicommlTransform
 from dicomml.cases.case import DicommlCase
 
 
@@ -53,15 +53,15 @@ class Save(DicommlTransform):
                 folder: [case.save(folder) for case in cases]}
         else:
             files = {}
-            for name, cases in self.split_case_list(cases):
+            for name, _cases in self.split_case_list(cases).items():
                 folder_name = os.path.join(folder, name)
-                for case in cases:
+                for case in _cases:
                     case.save(folder_name)
                 files.update({name: folder_name})
         return files
 
     def split_case_list(self, cases):
-        if sum(self.split_ratios) != 1:
+        if sum(self.split_ratios.values()) != 1:
             raise ValueError('Split ratios have to add up to one.')
         casesets = dict()
         _prev_ratio = 0
@@ -69,9 +69,8 @@ class Save(DicommlTransform):
             _lower_index = int(_prev_ratio * len(cases))
             _upper_index = int((_prev_ratio + ratio) * len(cases))
             casesets.update({name: cases[_lower_index:_upper_index]})
-            _prev_ratio = ratio
+            _prev_ratio += ratio
         # add remaining cases to last dataset
         if _upper_index < len(cases):
-            casesets[list(casesets.keys())[-1]].append(
-                cases[_upper_index:])
+            casesets[list(casesets.keys())[-1]] += cases[_upper_index:]
         return casesets

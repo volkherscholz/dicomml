@@ -4,7 +4,7 @@ from dicomml.cases.case import DicommlCase
 from dicomml.transforms import array as transforms
 from dicomml.transforms import expand
 
-from . import sample_case_config
+from tests import sample_case_config
 
 
 class TestArrayTransforms(unittest.TestCase):

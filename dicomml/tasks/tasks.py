@@ -4,7 +4,7 @@ import logging
 from ray import tune
 
 from dicomml import resolve as dicomml_resolve
-from dicomml.logging import setup_logging
+from dicomml.log import setup_logging
 
 
 class DicommlTask:
@@ -23,7 +23,7 @@ class DicommlTask:
         self.config = config or {}
         setup_logging()
         self.logger = logging.getLogger('{}.{}'.format(
-            type(self).__module__.__name__,
+            type(self).__module__,
             type(self).__name__))
 
     def run(self):
@@ -48,7 +48,11 @@ class DicommlLTS(DicommlTask):
         # construct transforms
         transforms = []
         for kind, config in steps.items():
-            transforms.append(dicomml_resolve(kind)(**config))
+            if isinstance(kind, str):
+                Task = dicomml_resolve(kind)
+            else:
+                Task = kind
+            transforms.append(Task(**config))
         # load
         cases = Load(**load_config)(folder=folder_in)
         # transform

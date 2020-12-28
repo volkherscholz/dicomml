@@ -172,6 +172,7 @@ class DicommlCase:
             format='zip',
             root_dir=tempfolder,
             base_dir=self.caseid)
+        rmtree(tempfolder)
         return file_path
 
     @classmethod
@@ -191,23 +192,30 @@ class DicommlCase:
         diagnose = _meta['diagnose']
         images_to_diagnosis = _meta['images_to_diagnosis']
         images_to_rois = _meta['images_to_rois']
+        # turn image keys into floats again
+        try:
+            images_to_diagnosis = {
+                float(key): arr for key, arr in images_to_diagnosis.items()}
+            images_to_rois = {
+                float(key): arr for key, arr in images_to_rois.items()}
+        except ValueError:
+            pass
         # load images
         if os.path.isfile(os.path.join(_path, 'images.npz')):
-            with open(os.path.join(_path, 'images.npz'), 'rb') as _f:
-                images = np.load(_f)
-                # try to convert keys to floats
-                # for the z coordinate
+            with np.load(os.path.join(_path, 'images.npz')) as _images:
                 try:
-                    images = {float(key): arr for key, arr in images.items()}
+                    images = {float(key): arr for key, arr in _images.items()}
                 except ValueError:
-                    pass
+                    images = {key: arr for key, arr in _images.items()}
         else:
             images = {}
         if os.path.isfile(os.path.join(_path, 'rois.npz')):
-            with open(os.path.join(_path, 'images.npz'), 'rb') as _f:
-                rois = np.load(_f)
+            with np.load(os.path.join(_path, 'rois.npz')) as _rois:
+                rois = {key: arr for key, arr in _rois.items()}
         else:
             rois = {}
+        # remove temp folder
+        rmtree(tempfolder)
         return cls(
             caseid=caseid,
             images=images,
@@ -396,3 +404,24 @@ class DicommlCase:
                 _arr = _arr.astype(np.int16)
             _arr = _arr + np.int16(intercept)
         return data, _arr
+
+    def __eq__(self, other):
+        if not isinstance(other, type(self)):
+            raise NotImplementedError
+        keys_equal = all([
+            self.caseid == other.caseid,
+            set(self.images.keys()) == set(other.images.keys()),
+            set(self.images_metadata.keys()) == set(other.images_metadata.keys()),  # noqa 501
+            set(self.rois.keys()) == set(other.rois.keys()),
+            set(self.diagnose.keys()) == set(other.diagnose.keys())])
+        if not keys_equal:
+            return False
+        return all([
+            all([np.array_equal(self.images[imgkey], other.images[imgkey])
+                 for imgkey in self.images.keys()]),
+            all([np.array_equal(self.rois[roikey], other.rois[roikey])
+                 for roikey in self.rois.keys()]),
+            all([set(self.images_to_rois[imgkey]) == set(other.images_to_rois[imgkey])  # noqa 501
+                 for imgkey in self.images_to_rois.keys()]),
+            all([set(self.images_to_diagnosis[imgkey]) == set(other.images_to_diagnosis[imgkey])  # noqa 501
+                 for imgkey in self.images_to_diagnosis.keys()])])
