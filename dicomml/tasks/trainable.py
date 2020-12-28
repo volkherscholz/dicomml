@@ -7,7 +7,7 @@ from typing import Tuple, Dict, List, Union
 from ray import tune
 
 from dicomml import resolve as dicomml_resolve
-from dicomml.logging import setup_logging
+from dicomml.log import setup_logging
 from dicomml.cases.case import DicommlCase
 from dicomml.transforms.transform import DicommlTransform
 
