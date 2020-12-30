@@ -24,5 +24,5 @@ class TestDicommlCase(unittest.TestCase):
         exports = case.export()
         self.assertCountEqual(
             list(exports.keys()),
-            ['images', 'rois', 'labels'])
+            ['images', 'truth'])
         self.assertEqual(exports['images'].shape, (10, 120, 120, 1))

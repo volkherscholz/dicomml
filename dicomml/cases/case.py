@@ -276,10 +276,18 @@ class DicommlCase:
                 # zero diagnose
                 _diagnose_array.append(np.zeros(len(diagnose_label_set)))
         data = dict(images=np.expand_dims(_image_array, axis=-1))
-        if include_diagnoses:
-            data.update(dict(labels=np.array(_diagnose_array)))
-        if include_rois:
-            data.update(dict(rois=np.expand_dims(_roi_array, -1)))
+        # truth tensor
+        if include_rois and include_diagnoses:
+            truth = dict(
+                labels=np.array(_diagnose_array),
+                rois=np.expand_dims(_roi_array, -1))
+        elif include_rois:
+            truth = np.expand_dims(_roi_array, -1)
+        elif include_diagnoses:
+            truth = np.array(_diagnose_array)
+        else:
+            truth = None
+        data.update(dict(truth=truth))
         return data
 
     def iterate(self,
