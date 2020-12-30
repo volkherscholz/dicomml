@@ -5,6 +5,7 @@ from ray import tune
 
 from dicomml import resolve as dicomml_resolve
 from dicomml.log import setup_logging
+from dicomml.tasks.trainable import DicommlTrainable
 
 
 class DicommlTask:
@@ -66,9 +67,9 @@ class DicommlLTS(DicommlTask):
 class DicommlTrain(DicommlTask):
 
     def task(self,
-             trainable_class: Union[str, tune.Trainable],
              trainable_config: dict,
              metric: str,
+             trainable_class: Union[str, tune.Trainable] = DicommlTrainable,
              mode: str = 'min',
              scheduler_class: Union[str, None] = None,
              scheduler_config: Union[dict, None] = None,
@@ -79,13 +80,13 @@ class DicommlTrain(DicommlTask):
             Trainable = dicomml_resolve(trainable_class)
         else:
             Trainable = trainable_class
-        if isinstance(scheduler_class):
+        if isinstance(scheduler_class, str):
             scheduler = dicomml_resolve(scheduler_class)(**scheduler_config)
         analysis = tune.run(
             run_or_experiment=Trainable,
             config=trainable_config,
             scheduler=scheduler,
-            mode=mode,
+            checkpoint_at_end=True,
             **kwargs)
         best_trial = analysis.get_best_trial(metric=metric, mode=mode)
         checkpoint = analysis.get_best_checkpoint(trial=best_trial, mode=mode)

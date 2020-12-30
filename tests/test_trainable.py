@@ -59,7 +59,7 @@ class TestLTS(unittest.TestCase):
                  model_class='models.unet.UNETModel',
                  optimizer_class='keras.optimizers.Adam'),
              scheduler=scheduler,
-             stop={"training_iteration": 4},
+             stop={"training_iteration": 6},
              num_samples=2,
              reuse_actors=True,
              resources_per_trial=dict(

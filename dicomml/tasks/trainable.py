@@ -9,7 +9,7 @@ from ray import tune
 from dicomml import resolve as dicomml_resolve
 from dicomml.log import setup_logging
 from dicomml.cases.case import DicommlCase
-from dicomml.transforms.transform import DicommlTransform
+from dicomml.transforms import DicommlTransform
 
 
 class DicommlTrainable(tune.Trainable):
@@ -37,12 +37,16 @@ class DicommlTrainable(tune.Trainable):
             self.setup_training(**config)
         except ValueError as e:
             self.logger.error('Error setting up the training', exc_info=e)
+            raise e
 
-    def reset_config(self, config):
+    def reset_config(self, new_config):
         try:
-            self.setup_training(**config)
+            self.setup_training(**new_config)
+            self.config = new_config
+            return True
         except ValueError as e:
             self.logger.error('Error resetting the training', exc_info=e)
+            raise e
 
     def step(self):
         # reset metrics
@@ -57,6 +61,7 @@ class DicommlTrainable(tune.Trainable):
             self.eval_step(**next(self.eval_dataset))
         # return evaluation metric results & loss
         return dict(
+            training_step_count=self.training_step_count.read_value().numpy(),
             epoch=self.iteration,
             loss=self.loss_metric.result().numpy(),
             **{type(metric).__name__: metric.result().numpy()
@@ -68,7 +73,8 @@ class DicommlTrainable(tune.Trainable):
         """
         import tensorflow as tf
         ckpt = tf.train.Checkpoint(**self.get_variables())
-        ckpt.save(tmp_checkpoint_dir)
+        checkpoint_prefix = os.path.join(tmp_checkpoint_dir, "ckpt")
+        ckpt.save(file_prefix=checkpoint_prefix)
         self.logger.info('Saved state to checkpoint {}'.format(
             tmp_checkpoint_dir))
         return tmp_checkpoint_dir
@@ -90,11 +96,11 @@ class DicommlTrainable(tune.Trainable):
         import tensorflow as tf
         os.makedirs(self.checkpoints_path, exist_ok=True)
         rand_checkpoint_dir = os.path.join(
-            tempfile.mkdtemp(dir=self.checkpoints_path), 'data')
+            tempfile.mkdtemp(dir=self.checkpoints_path), 'checkpoints')
         # copy content
         shutil.copytree(tmp_checkpoint_dir, rand_checkpoint_dir)
         ckpt = tf.train.Checkpoint(**self.get_variables())
-        ckpt.restore(tmp_checkpoint_dir)
+        ckpt.restore(tf.train.latest_checkpoint(rand_checkpoint_dir))
         self.logger.info('Restored from checkpoint {}'.format(
             tmp_checkpoint_dir))
 
@@ -106,6 +112,8 @@ class DicommlTrainable(tune.Trainable):
                    transformations: Dict[str, dict] = dict(),
                    shuffle_buffer_size: int = 100,
                    cache_dir: str = '',
+                   padded_shapes: Union[list, None] = None,
+                   data_keys: List[str] = [],
                    export_config: dict = dict(),
                    **kwargs):
         import tensorflow as tf
@@ -115,6 +123,7 @@ class DicommlTrainable(tune.Trainable):
             @classmethod
             def from_folder(cls,
                             path: str = '.',
+                            data_keys: List[str] = [],
                             transformations: List[DicommlTransform] = [],
                             shuffle_buffer_size: int = 10,
                             batch_size: int = 1,
@@ -130,29 +139,43 @@ class DicommlTrainable(tune.Trainable):
 
                 def load_case_transform(file):
 
+                    def load(file):
+                        return [DicommlCase.load(file.numpy().decode('utf-8'))]
+
                     def apply_transforms(cases):
                         for transform in transformations:
                             cases = transform(cases)
                         return cases
 
-                    return [
-                        case.export(**kwargs)
-                        for case in apply_transforms([DicommlCase.load(file)])]
+                    def export(cases):
+                        return [[
+                            case.export(**kwargs)[data_key]
+                            for data_key in data_keys]
+                            for case in cases]
+
+                    func = tf.py_function(
+                        func=lambda file: export(apply_transforms(load(file))),
+                        inp=[file],
+                        Tout=[tf.float32 for _ in range(len(data_keys))])
+
+                    return cls.from_tensor_slices({
+                        data_key: func[i]
+                        for i, data_key in enumerate(data_keys)})
 
                 # construct datasets
                 return cls.from_tensor_slices(files) \
-                    .shuffle(shuffle_buffer_size) \
                     .interleave(
                         lambda _file: load_case_transform(_file),
                         num_parallel_calls=tf.data.experimental.AUTOTUNE,
                         deterministic=False) \
-                    .prefetch(tf.data.experimental.AUTOTUNE) \
                     .padded_batch(
                         batch_size=batch_size,
                         padded_shapes=padded_shapes,
                         padding_values=padding_value,
                         drop_remainder=drop_remainder) \
                     .cache(filename=cache_file) \
+                    .prefetch(tf.data.experimental.AUTOTUNE) \
+                    .shuffle(shuffle_buffer_size) \
                     .repeat()
 
         transformations = [
@@ -172,6 +195,8 @@ class DicommlTrainable(tune.Trainable):
             shuffle_buffer_size=shuffle_buffer_size,
             batch_size=train_batch_size,
             cache_file=train_cache,
+            data_keys=data_keys,
+            padded_shapes=padded_shapes,
             **export_config))
         self.eval_dataset = iter(_DicommlDataset.from_folder(
             path=eval_path,
@@ -179,6 +204,8 @@ class DicommlTrainable(tune.Trainable):
             shuffle_buffer_size=shuffle_buffer_size,
             batch_size=eval_batch_size,
             cache_file=eval_cache,
+            data_keys=data_keys,
+            padded_shapes=padded_shapes,
             **export_config))
 
     def setup_training(self,
@@ -191,63 +218,59 @@ class DicommlTrainable(tune.Trainable):
         import tensorflow as tf
         # setup metrics
         _class, _config = loss_function
-        self.loss_function = dicomml_resolve(_class)(**_config)
+        self.loss_function = dicomml_resolve(_class, prefix='tf')(**_config)
         _class, _config = train_metric
-        self.loss_metric = dicomml_resolve(_class)(**_config)
+        self.loss_metric = dicomml_resolve(_class, prefix='tf')(**_config)
         self.eval_metrics = [
-            dicomml_resolve(kind)(**config)
+            dicomml_resolve(kind, prefix='tf')(**config)
             for kind, config in eval_metrics.items()]
         # ensure that the variables are defined
         try:
             # make sure not to reset trainstep if config is reset,
             # i.e. in case of actor reuse
-            getattr(self, 'trainstep')
+            getattr(self, 'training_step_count')
         except AttributeError:
-            self.trainstep = tf.Variable(
+            self.training_step_count = tf.Variable(
                 initial_value=0, dtype=tf.int64, trainable=False)
         self.model = dicomml_resolve(model_class)(**{
-            key: val for key, val in kwargs.items()
+            key[6:]: val for key, val in kwargs.items()
             if 'model_' in key})
-        self.optimizer = dicomml_resolve(optimizer_class)(**{
-            key: val for key, val in kwargs.items()
+        self.optimizer = dicomml_resolve(optimizer_class, prefix='tf')(**{
+            key[10:]: val for key, val in kwargs.items()
             if 'optimizer_' in key})
 
         # train step
         @tf.function
-        def train_step(self, images, **kwargs):
+        def train_step(images, truth):
             with tf.GradientTape() as tape:
                 # run the inputs through the model
                 # record operations
                 predictions = self.model(images)
                 # compute loss
-                loss_value = self.loss_function(predictions, **kwargs)
+                loss_value = self.loss_function(predictions, truth)
                 # add layer regularization losses
                 loss_value += sum(self.model.losses)
             # Obtain gradients
             grads = tape.gradient(loss_value, self.model.trainable_variables)
-            # Clip gradients by norm
-            if hasattr(self.optimizer, "clipnorm"):
-                grads = [
-                    tf.clip_by_norm(g, self.optimizer.clipnorm) for g in grads]
             # Apply gradients
             self.optimizer.apply_gradients(
                 zip(grads, self.model.trainable_variables))
             # update metrics
-            self.loss_metric.update_state(predictions, **kwargs)
-            self.trainstep.assign_add(1)
+            self.loss_metric.update_state(predictions, truth)
+            self.training_step_count.assign_add(1)
 
         # eval step
         @tf.function
-        def eval_step(images, **kwargs):
+        def eval_step(images, truth):
             predictions = self.model(images)
             for metric in self.eval_metrics:
-                metric.update_state(predictions, **kwargs)
+                metric.update_state(predictions, truth)
 
         self.train_step = train_step
         self.eval_step = eval_step
 
     def get_variables(self) -> dict:
         return dict(
-            step=self.trainstep,
+            step=self.training_step_count,
             model=self.model,
             optimizer=self.optimizer)
