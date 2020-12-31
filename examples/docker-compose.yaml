@@ -1,0 +1,15 @@
+version: '3.4'
+services:
+  prepare:
+    image: volkherscholz/dicomml:latest
+    volumes:
+      - /mnt:/data
+      - ./hpruns:/hpruns
+    command: /dicomml/examples/prepare.py
+
+  training:
+    image: volkherscholz/dicomml:latest
+    volumes:
+      - /mnt:/data
+      - ./hpruns:/hpruns
+    command: /dicomml/examples/training.py
