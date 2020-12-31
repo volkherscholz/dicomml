@@ -39,6 +39,7 @@ def get_config(args) -> dict:
                 value_ranges=dict(angle=(-20, 20)))},
         folder_out=args.folder_out,
         save_config=dict(
+            shuffle_cases=True,
             split_ratios=dict(
                 train=0.8,
                 eval=0.1,

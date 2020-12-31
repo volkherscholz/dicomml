@@ -41,9 +41,11 @@ class Save(DicommlTransform):
 
     def __init__(self,
                  split_ratios: Union[Dict[str, float], None] = None,
+                 shuffle_cases: bool = False,
                  **kwargs):
         super(Load).__init__(**kwargs)
         self.split_ratios = split_ratios
+        self.shuffle_cases = shuffle_cases
 
     def __call__(self,
                  cases: List[DicommlCase],
@@ -53,6 +55,9 @@ class Save(DicommlTransform):
                 folder: [case.save(folder) for case in cases]}
         else:
             files = {}
+            if self.shuffle_cases:
+                import random
+                random.shuffle(cases)
             for name, _cases in self.split_case_list(cases).items():
                 folder_name = os.path.join(folder, name)
                 for case in _cases:
