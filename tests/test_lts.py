@@ -50,6 +50,7 @@ class TestLTS(unittest.TestCase):
             ['train', 'eval', 'test'])
         case_files = glob.glob(os.path.join(self.folder_out, '*', '*.zip'))
         self.assertEqual(len(case_files), 88)
+        shutil.rmtree(self.folder_out)
 
     def test_parallel_task(self):
         parallel = [dict(
@@ -62,7 +63,7 @@ class TestLTS(unittest.TestCase):
                 parallel_configs=parallel)))
         case_files = glob.glob(os.path.join(self.folder_out, '*', '*.zip'))
         self.assertEqual(len(case_files), 88)
+        shutil.rmtree(self.folder_out)
 
     def tearDown(self):
         shutil.rmtree(self.folder_in)
-        shutil.rmtree(self.folder_out)
