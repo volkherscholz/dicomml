@@ -15,7 +15,7 @@ class DicommlTransform:
         if name is None:
             name = type(self).__name__
         self.name = name
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger(type(self).__name__)
 
     def transform(self, cases: List[DicommlCase]) -> List[DicommlCase]:
         transformed_cases = []
@@ -62,6 +62,7 @@ class ArrayTransform(DicommlTransform):
                 for key, arr in case.rois.items()}
         else:
             rois = case.rois
+        self.logger.info('Applied transform to case {}'.format(case.caseid))
         return DicommlCase(
             caseid=case.caseid,
             images=images,

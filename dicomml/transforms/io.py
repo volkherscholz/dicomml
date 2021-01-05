@@ -16,7 +16,7 @@ class Load(DicommlTransform):
                  load_config: dict = dict(),
                  filename_pattern: str = '*.zip',
                  **kwargs):
-        super(Load).__init__(**kwargs)
+        super(Load, self).__init__(**kwargs)
         self.load_from_dicom = load_from_dicom
         self.load_config = load_config
         self.filename_pattern = filename_pattern
@@ -31,6 +31,8 @@ class Load(DicommlTransform):
             cases = [
                 DicommlCase.load(_file)
                 for _file in files]
+            self.logger.info('Loaded cases: {}'.format(
+                [case.caseid for case in cases]))
         return cases
 
 
@@ -43,7 +45,7 @@ class Save(DicommlTransform):
                  split_ratios: Union[Dict[str, float], None] = None,
                  shuffle_cases: bool = False,
                  **kwargs):
-        super(Load).__init__(**kwargs)
+        super(Save, self).__init__(**kwargs)
         self.split_ratios = split_ratios
         self.shuffle_cases = shuffle_cases
 
@@ -63,6 +65,8 @@ class Save(DicommlTransform):
                 for case in _cases:
                     case.save(folder_name)
                 files.update({name: folder_name})
+                self.logger.info('Saved cases {} to folder {}'.format(
+                    [case.caseid for case in _cases], folder_name))
         return files
 
     def split_case_list(self, cases):
