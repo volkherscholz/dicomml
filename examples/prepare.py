@@ -6,6 +6,8 @@
 #
 #################################
 
+import os
+import glob
 import argparse
 from dicomml.tasks.main import run_pipeline
 
@@ -18,6 +20,18 @@ def get_arguments():
         dest='folder_in',
         help='input folder')
     parser.add_argument(
+        "--num_workers",
+        action='store_int',
+        dest='num_workers',
+        default=4,
+        help='Number of workers')
+    parser.add_argument(
+        "--num_concurrent_files",
+        action='store_int',
+        dest='num_concurrent_files',
+        default=1,
+        help='Number of concurrent files processed per worker')
+    parser.add_argument(
         "--folder_out",
         action='store',
         dest='folder_out',
@@ -26,10 +40,12 @@ def get_arguments():
 
 
 def get_config(args) -> dict:
-    return dict(
-        folder_in=args.folder_in,
-        load_config=dict(
-            filename_pattern='*.zip'),
+    filenames = glob.glob(os.path.join(args.folder_in, '*.zip'))
+    n = round(len(filenames) / args.num_workers)
+    chunks = [filenames[i:i + n] for i in range(0, len(filenames), n)]
+
+    config = dict(
+        num_concurrent_files=args.num_concurrent_files,
         steps={
             'transforms.expand.Split': dict(
                 n_images=10),
@@ -44,18 +60,15 @@ def get_config(args) -> dict:
                 train=0.8,
                 eval=0.1,
                 test=0.1)))
-
-
-def get_parallel_config():
-    return [
-        dict(load_config=dict(filename_pattern='{i}*.zip'.format(i=i)))
-        for i in range(5)]
+    parallel_config = [
+        dict(filenames=chunk)
+        for chunk in chunks]
+    return config, parallel_config
 
 
 def main():
     args = get_arguments()
-    config = get_config(args)
-    parallel_config = get_parallel_config()
+    config, parallel_config = get_config(args)
     run_pipeline(tasks=dict(lts=dict(
         task_class='tasks.tasks.DicommlLTS',
         config=config,

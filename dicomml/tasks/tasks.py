@@ -1,5 +1,7 @@
-from typing import Union, Dict
+from typing import Union, Dict, List
 import logging
+import glob
+import os
 
 from ray import tune
 
@@ -40,7 +42,10 @@ class DicommlTask:
 class DicommlLTS(DicommlTask):
 
     def task(self,
-             folder_in: str = '.',
+             filenames: Union[List[str], None] = None,
+             num_concurrent_files: Union[int, None] = None,
+             folder_in: Union[str, None] = None,
+             filename_pattern: str = '*.zip',
              load_config: dict = dict(),
              steps: Dict[str, dict] = dict(),
              folder_out: str = './out',
@@ -55,13 +60,25 @@ class DicommlLTS(DicommlTask):
                 Task = kind
             transforms.append(Task(**config))
         # load
-        cases = Load(**load_config)(folder=folder_in)
-        # transform
-        for transform in transforms:
-            cases = transform(cases)
-        # save
-        files = Save(**save_config)(cases=cases, folder=folder_out)
-        return files
+        if filenames is None:
+            filenames = glob.glob(os.path.join(folder_in, filename_pattern))
+        if num_concurrent_files is None:
+            num_concurrent_files = len(filenames)
+
+        def shards():
+            for i in range(0, len(filenames), num_concurrent_files):
+                yield filenames[i:i + num_concurrent_files]
+
+        results = {}
+        for files in shards():
+            cases = Load(**load_config)(files=files)
+            # transform
+            for transform in transforms:
+                cases = transform(cases)
+            # save
+            files = Save(**save_config)(cases=cases, folder=folder_out)
+            results.update(files)
+        return results
 
 
 class DicommlTrain(DicommlTask):

@@ -15,8 +15,7 @@ class TestLTS(unittest.TestCase):
     def get_config(self):
         return dict(
             folder_in=self.folder_in,
-            load_config=dict(
-                filename_pattern='*.zip'),
+            num_concurrent_files=1,
             steps={
                 'transforms.expand.Split': dict(
                     n_images=5),
@@ -53,10 +52,11 @@ class TestLTS(unittest.TestCase):
         shutil.rmtree(self.folder_out)
 
     def test_parallel_task(self):
-        parallel = [dict(
-            load_config=dict(
-                filename_pattern='*-{i}.zip'.format(i=i)))
-            for i in range(4)]
+        import glob
+        files = glob.glob(os.path.join(self.folder_in, '*.zip'))
+        parallel = [
+            dict(filenames=files[0:2]),
+            dict(filenames=files[2:4])]
         run_pipeline(tasks=dict(lts=dict(
                 task_class='tasks.tasks.DicommlLTS',
                 config=self.get_config(),

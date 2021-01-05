@@ -1,5 +1,4 @@
 import os
-import glob
 from typing import Union, List, Dict
 
 from dicomml.transforms import DicommlTransform
@@ -14,15 +13,12 @@ class Load(DicommlTransform):
     def __init__(self,
                  load_from_dicom: bool = False,
                  load_config: dict = dict(),
-                 filename_pattern: str = '*.zip',
                  **kwargs):
         super(Load, self).__init__(**kwargs)
         self.load_from_dicom = load_from_dicom
         self.load_config = load_config
-        self.filename_pattern = filename_pattern
 
-    def __call__(self, folder: str = '.') -> List[DicommlCase]:
-        files = glob.glob(os.path.join(folder, self.filename_pattern))
+    def __call__(self, files: List[str] = []) -> List[DicommlCase]:
         if self.load_from_dicom:
             cases = [
                 DicommlCase.from_dicom_zipfile(_file, **self.load_config)
