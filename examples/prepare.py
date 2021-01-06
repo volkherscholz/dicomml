@@ -21,13 +21,15 @@ def get_arguments():
         help='input folder')
     parser.add_argument(
         "--num_workers",
-        action='store_int',
+        action='store',
+        type=int,
         dest='num_workers',
         default=4,
         help='Number of workers')
     parser.add_argument(
         "--num_concurrent_files",
-        action='store_int',
+        action='store',
+        typ=int,
         dest='num_concurrent_files',
         default=1,
         help='Number of concurrent files processed per worker')
