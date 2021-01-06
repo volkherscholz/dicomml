@@ -29,7 +29,7 @@ def get_arguments():
     parser.add_argument(
         "--num_concurrent_files",
         action='store',
-        typ=int,
+        type=int,
         dest='num_concurrent_files',
         default=1,
         help='Number of concurrent files processed per worker')
