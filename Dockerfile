@@ -1,10 +1,11 @@
-FROM volkherscholz/tensorflow-gdcm:tf-2.4.0-gpu
+FROM pytorch/pytorch:1.7.0-cuda11.0-cudnn8-runtime
 
-# install gdcm
+RUN conda install -c conda-forge gdcm && \
+    pip install --no-cache-dir -r requirements.txt
+
 COPY . /dicomml
 WORKDIR /dicomml
 
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install .
+RUN pip install .
 
 ENTRYPOINT ["python"]

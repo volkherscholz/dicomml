@@ -7,5 +7,4 @@ services:
     volumes:
       - ..:/workspace:cached
       - ../../dicomml-experimentation:/workspace/notebooks
-      - ../../dicomml-old:/workspace/old-cod
     command: /bin/sh -c "while sleep 1000; do :; done"
