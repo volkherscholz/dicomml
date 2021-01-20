@@ -1,10 +1,10 @@
 import logging
 import os
-import shutil
 import tempfile
 from typing import Tuple, Dict, List, Union
 
 from ray import tune
+import torch
 
 from dicomml import resolve as dicomml_resolve
 from dicomml.log import setup_logging
@@ -32,6 +32,9 @@ class DicommlTrainable(tune.Trainable):
             'train_iterations_per_step', 10)
         self.eval_iterations_per_step = config.get(
             'eval_iterations_per_step', 10)
+        self.device = "cuda:0" if (
+            config.get("use_gpu", True) and torch.cuda.is_available()
+            ) else "cpu"
         try:
             self.setup_data(**config)
             self.setup_training(**config)
@@ -71,36 +74,20 @@ class DicommlTrainable(tune.Trainable):
         """
         save current state to checkpoint
         """
-        import tensorflow as tf
-        ckpt = tf.train.Checkpoint(**self.get_variables())
-        checkpoint_prefix = os.path.join(tmp_checkpoint_dir, "ckpt")
-        ckpt.save(file_prefix=checkpoint_prefix)
-        self.logger.info('Saved state to checkpoint {}'.format(
-            tmp_checkpoint_dir))
-        return tmp_checkpoint_dir
+        checkpoint_path = os.path.join(tmp_checkpoint_dir, "checkpoint")
+        torch.save({
+            key: var.state_dict()
+            for key, var in self.get_variables().items()})
+        return checkpoint_path
 
     def load_checkpoint(self, tmp_checkpoint_dir: str):
         """
         Initialize or reload from checkpoints
         """
-        # ray has the following behaviour:
-        # unpickle checkpoint to a temporary directory, call restore,
-        # and then delete the temporary directory
-        # This creates an issue with the delayed restoration of checkpoints
-        # in tf models, as some variables are only created after a first
-        # model call -- and then the temporary directory is not longer
-        # available.
-        # Solution: copy the tmp_checkpoint_dir to another tmp dir,
-        # which is not deleted.
-        # create random directory under checkpoint dir
-        import tensorflow as tf
-        os.makedirs(self.checkpoints_path, exist_ok=True)
-        rand_checkpoint_dir = os.path.join(
-            tempfile.mkdtemp(dir=self.checkpoints_path), 'checkpoints')
-        # copy content
-        shutil.copytree(tmp_checkpoint_dir, rand_checkpoint_dir)
-        ckpt = tf.train.Checkpoint(**self.get_variables())
-        ckpt.restore(tf.train.latest_checkpoint(rand_checkpoint_dir))
+        checkpoint_path = os.path.join(tmp_checkpoint_dir, "checkpoint")
+        checkpoint = torch.load(checkpoint_path)
+        for key, var in self.get_variables().items():
+            var.load_state_dict(checkpoint[key])
         self.logger.info('Restored from checkpoint {}'.format(
             tmp_checkpoint_dir))
 
@@ -117,6 +104,45 @@ class DicommlTrainable(tune.Trainable):
                    export_config: dict = dict(),
                    **kwargs):
         import tensorflow as tf
+
+        class _Dataset(torch.utils.data.Dataset):
+
+            def __init__(self,
+                         path: str = '.',
+                         transformations: dict = dict(),
+                         **kwargs):
+                import glob
+                self.files = [
+                    _f for _f in glob.glob(path, recursive=True)
+                    if os.path.isfile(_f)]
+                self.transformations = [
+                    dicomml_resolve(kind)(**cfg)
+                    for kind, cfg in transformations.items()]
+                self.export_kwargs = kwargs
+
+            def __len__(self):
+                return len(self.files)
+
+            def __getitem__(self, idx):
+                if torch.is_tensor(idx):
+                    idx = idx.tolist()
+                return self.export(
+                    self.apply_transforms(
+                        self.load(
+                            self.files[idx])))
+
+            def load(filename):
+                return [DicommlCase.load(filename)]
+
+            def apply_transforms(cases):
+                for transform in self.transformations:
+                    cases = transform(cases)
+                return cases
+
+            def export(cases):
+                # assume that all transformations only
+                # act on one case
+                return cases[0].export(**self.export_kwargs)
 
         class _DicommlDataset(tf.data.Dataset):
 
@@ -271,6 +297,5 @@ class DicommlTrainable(tune.Trainable):
 
     def get_variables(self) -> dict:
         return dict(
-            step=self.training_step_count,
             model=self.model,
             optimizer=self.optimizer)
