@@ -8,14 +8,15 @@ jobs:
     name: test
     runs-on: ubuntu-latest
     container: 
-      image: "volkherscholz/tensorflow-gdcm"
+      image: "pytorch/pytorch:1.7.0-cuda11.0-cudnn8-runtime"
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: install
       run: |
-        pip install --no-cache-dir -r requirements.txt
-        pip install flake8
+        conda install -c conda-forge gdcm
+        conda install --file requirements.txt
+        conda install flake8
         pip install .
     - name: lint
       run: |

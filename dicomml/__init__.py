@@ -7,8 +7,6 @@ def resolve(s: str, prefix: str = 'dicomml'):
     syntax.
     -- copied from lib/logging/config
     """
-    if prefix == 'tf':
-        prefix = 'tensorflow'
     name = '{prefix}.{s}'.format(prefix=prefix, s=s).split('.')
     used = name.pop(0)
     try:
