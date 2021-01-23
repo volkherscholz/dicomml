@@ -58,10 +58,20 @@ class DicommlTrainable(tune.Trainable):
         self.metric_states.reset()
         # training steps
         for _ in range(self.train_iterations_per_step):
-            self.train_step(**next(self.train_dataset))
+            try:
+                data = next(self.train_dataiter)
+            except StopIteration:
+                self.train_dataiter = iter(self.train_dataloader)
+                data = next(self.train_dataiter)
+            self.train_step(**data)
         # evaluation steps
         for _ in range(self.eval_iterations_per_step):
-            self.metric_states(self.eval_step(**next(self.eval_dataset)))
+            try:
+                data = next(self.eval_dataiter)
+            except StopIteration:
+                self.eval_dataiter = iter(self.eval_dataloader)
+                data = next(self.eval_dataiter)
+            self.metric_states(self.eval_step(**data))
         # return evaluation metric results & loss
         return dict(
             epoch=self.iteration,
@@ -137,26 +147,26 @@ class DicommlTrainable(tune.Trainable):
                 # act on one case
                 return cases[0].export(**self.export_kwargs)
 
-        self.train_dataset = iter(
-            torch.utils.data.DataLoader(
-                dataset=_DicommlDataset(
-                    path=train_path,
-                    transformations=transformations,
-                    **export_config),
-                batch_size=train_batch_size,
-                shuffle=True,
-                num_workers=num_workers,
-                drop_last=drop_last))
-        self.eval_dataset = iter(
-            torch.utils.data.DataLoader(
-                dataset=_DicommlDataset(
-                    path=eval_path,
-                    transformations=transformations,
-                    **export_config),
-                batch_size=eval_batch_size,
-                shuffle=True,
-                num_workers=0,
-                drop_last=drop_last))
+        self.train_dataloader = torch.utils.data.DataLoader(
+            dataset=_DicommlDataset(
+                path=train_path,
+                transformations=transformations,
+                **export_config),
+            batch_size=train_batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            drop_last=drop_last)
+        self.train_dataiter = iter(self.train_dataloader)
+        self.eval_dataloader = torch.utils.data.DataLoader(
+            dataset=_DicommlDataset(
+                path=eval_path,
+                transformations=transformations,
+                **export_config),
+            batch_size=eval_batch_size,
+            shuffle=True,
+            num_workers=0,
+            drop_last=drop_last)
+        self.eval_dataiter = iter(self.eval_dataloader)
 
     def setup_training(self,
                        loss: Tuple[str, dict],
