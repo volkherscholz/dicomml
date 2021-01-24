@@ -1,7 +1,9 @@
 import logging
 import os
 import tempfile
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict
+from functools import partial
+import numpy as np
 
 from ray import tune
 import torch
@@ -31,8 +33,6 @@ class DicommlTrainable(tune.Trainable):
             'train_iterations_per_step', 10)
         self.eval_iterations_per_step = config.get(
             'eval_iterations_per_step', 10)
-        self.sample_weight = config.get(
-            'evaluation_weights', None)
         self.device = "cuda:0" if (
             config.get("use_gpu", True) and torch.cuda.is_available()
             ) else "cpu"
@@ -84,8 +84,9 @@ class DicommlTrainable(tune.Trainable):
         checkpoint_path = os.path.join(tmp_checkpoint_dir, "checkpoint")
         torch.save({
             key: var.state_dict()
-            for key, var in self.get_variables().items()})
-        return checkpoint_path
+            for key, var in self.get_variables().items()},
+            checkpoint_path)
+        return tmp_checkpoint_dir
 
     def load_checkpoint(self, tmp_checkpoint_dir: str):
         """
@@ -129,20 +130,17 @@ class DicommlTrainable(tune.Trainable):
             def __getitem__(self, idx):
                 if torch.is_tensor(idx):
                     idx = idx.tolist()
-                return self.export(
-                    self.apply_transforms(
-                        self.load(
-                            self.files[idx])))
+                return self.export(self.apply_transforms(self.load(idx)))
 
-            def load(filename):
-                return [DicommlCase.load(filename)]
+            def load(self, idx):
+                return [DicommlCase.load(self.files[idx])]
 
-            def apply_transforms(cases):
+            def apply_transforms(self, cases):
                 for transform in self.transformations:
                     cases = transform(cases)
                 return cases
 
-            def export(cases):
+            def export(self, cases):
                 # assume that all transformations only
                 # act on one case
                 return cases[0].export(**self.export_kwargs)
@@ -169,26 +167,31 @@ class DicommlTrainable(tune.Trainable):
         self.eval_dataiter = iter(self.eval_dataloader)
 
     def setup_training(self,
-                       loss: Tuple[str, dict],
-                       eval_metrics: List[str],
+                       loss_function: Tuple[str, dict],
+                       eval_metrics: Dict[str, dict],
                        model_class: str,
                        optimizer_class: str,
+                       binaries_predictons: bool = True,
+                       treshold_value: float = 0.5,
                        **kwargs):
         # setup metrics
-        _class, _config = loss
+        _class, _config = loss_function
         self.loss = dicomml_resolve(_class, prefix='torch')(**_config)
-        self.eval_metrics = [
-            dicomml_resolve(kind, prefix='sklearn.metrics')
-            for kind in eval_metrics]
+        self.eval_metrics = {
+            key: partial(dicomml_resolve(key, prefix='sklearn.metrics'), **cfg)
+            for key, cfg in eval_metrics.items()}
+        self.binaries_predictons = binaries_predictons
+        self.treshold_value = treshold_value
 
         self.model = dicomml_resolve(model_class)(**{
             key[6:]: val for key, val in kwargs.items()
             if 'model_' in key})
         self.model.to(self.device)
 
-        self.optimizer = dicomml_resolve(optimizer_class, prefix='torch')(**{
-            key[10:]: val for key, val in kwargs.items()
-            if 'optimizer_' in key})
+        self.optimizer = dicomml_resolve(optimizer_class, prefix='torch')(
+            self.model.parameters(),
+            **{key[10:]: val for key, val in kwargs.items()
+               if 'optimizer_' in key})
 
     def train_step(self,
                    images: torch.Tensor,
@@ -214,11 +217,13 @@ class DicommlTrainable(tune.Trainable):
             loss_value_np = loss_value.cpu().numpy()
             truth_np = truth.cpu().numpy()
             predictions_np = predictions.cpu().numpy()
+        if self.binaries_predictons:
+            predictions_np = np.where(
+                predictions_np > self.treshold_value, 1, 0)
         return {
             'validation_loss': loss_value_np,
-            **{metric.__name__: metric(
-                truth_np, predictions_np, sample_weight=self.sample_weight)
-               for metric in self.eval_metrics}}
+            **{name: metric(truth_np.reshape(-1), predictions_np.reshape(-1))
+               for name, metric in self.eval_metrics.items()}}
 
     def get_variables(self) -> dict:
         return dict(

@@ -229,7 +229,8 @@ class DicommlCase:
                include_diagnoses: bool = True,
                diagnose_label_set: List[str] = [],
                include_rois: bool = True,
-               order_images_with_index: bool = True
+               order_images_with_index: bool = True,
+               dtype: np.dtype = np.float32,
                ) -> Dict[str, np.ndarray]:
         """
         Exports the case for training or inference as dictionary
@@ -275,16 +276,21 @@ class DicommlCase:
             else:
                 # zero diagnose
                 _diagnose_array.append(np.zeros(len(diagnose_label_set)))
+        # convert to numpy arrays
+        _roi_array = np.array(_roi_array).astype(dtype)
+        _diagnose_array = np.array(_diagnose_array).astype(dtype)
+        _image_array = np.array(_image_array).astype(dtype)
+        # add to dict
         data = dict(images=np.expand_dims(_image_array, axis=0))
         # truth tensor
         if include_rois and include_diagnoses:
             truth = dict(
-                labels=np.array(_diagnose_array),
+                labels=_diagnose_array,
                 rois=np.expand_dims(_roi_array, 0))
         elif include_rois:
             truth = np.expand_dims(_roi_array, 0)
         elif include_diagnoses:
-            truth = np.array(_diagnose_array)
+            truth = _diagnose_array
         else:
             truth = None
         data.update(dict(truth=truth))

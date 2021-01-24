@@ -16,7 +16,7 @@ def sample_case_config(caseid: Union[str, None] = None,
         imgkey: np.random.randint(-1000, 2000, image_size)
         for imgkey in image_keys}
     rois = {
-        str(i): np.random.randint(0, 1, image_size)
+        str(i): np.random.randint(2, size=image_size)
         for i in range(n_rois)}
     diagnose = {
         str(i): 'diagnose-{i}'.format(i=i)

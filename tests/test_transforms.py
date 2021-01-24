@@ -31,7 +31,7 @@ class TestArrayTransforms(unittest.TestCase):
             y_range=[20, 100]
         )([case])[0]
         self.assertEqual(
-            (case.export()['images'].shape[0], 60, 80, 1),
+            (1, case.export()['images'].shape[1], 60, 80),
             case_new.export()['images'].shape)
 
     def test_rotate(self):

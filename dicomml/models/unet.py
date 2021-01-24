@@ -57,6 +57,7 @@ class UNETConvBlock(nn.Module):
                 slice_distributed(nn.BatchNorm2d)(num_features=n_channels_out))
         if activation:
             self.layers.append(nn.ReLU())
+        self.layers = nn.ModuleList(self.layers)
 
     def forward(self, x, **kwargs):
         for layer in self.layers:
@@ -125,7 +126,7 @@ class UNETModel(nn.Module):
                  n_classes: int = 1,
                  **kwargs):
         super(UNETModel, self).__init__()
-        self.downsampling_blocks = [
+        self.downsampling_blocks = nn.ModuleList([
             UNETDownSampleBlock(
                 n_channels_in=1,
                 n_channels_out=n_filters,
@@ -133,12 +134,12 @@ class UNETModel(nn.Module):
             UNETDownSampleBlock(
                 n_channels_in=2**i * n_filters,
                 n_channels_out=2**(i + 1) * n_filters,
-                **kwargs) for i in range(block_depth)]
+                **kwargs) for i in range(block_depth)])
         self.middle_layer = UNETConvBlock(
             n_channels_in=2**block_depth * n_filters,
             n_channels_out=2**block_depth * n_filters,
             **kwargs)
-        self.upsampling_blocks = [
+        self.upsampling_blocks = nn.ModuleList([
             UNETUpSampleBlock(
                 n_channels_in=2**i * n_filters,
                 n_channels_out=2**(i - 1) * n_filters,
@@ -146,7 +147,7 @@ class UNETModel(nn.Module):
             UNETUpSampleBlock(
                 n_channels_in=n_filters,
                 n_channels_out=n_classes,
-                **kwargs)]
+                **kwargs)])
 
     def forward(self, x):
         ys = []

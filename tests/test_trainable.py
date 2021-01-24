@@ -16,12 +16,12 @@ class TestLTS(unittest.TestCase):
         from ray import tune
 
         scheduler = tune.schedulers.PopulationBasedTraining(
-            time_attr="training_step_count",
-            metric='BinaryAccuracy',
+            time_attr="training_iteration",
+            metric='jaccard_score',
             mode='max',
             perturbation_interval=2,
             hyperparam_mutations={
-                "optimizer_learning_rate": lambda: np.random.uniform(0.001, 1),
+                "optimizer_lr": lambda: np.random.uniform(0.001, 1),
                 "model_dropoutrate": lambda: np.random.uniform(0.05, 0.15)},
             quantile_fraction=0.5,
             resample_probability=1.0,
@@ -29,7 +29,7 @@ class TestLTS(unittest.TestCase):
             require_attrs=True)
 
         return dict(
-             metric='BinaryAccuracy',
+             metric='jaccard_score',
              mode='max',
              trainable_config=dict(
                  train_iterations_per_step=2,
@@ -39,25 +39,15 @@ class TestLTS(unittest.TestCase):
                  train_batch_size=2,
                  eval_batch_size=2,
                  shuffle_buffer_size=2,
-                 data_keys=['images', 'truth'],
-                 padded_shapes={'images': [10, 120, 120, 1], 'truth': [10, 120, 120, 1]},  # noqa 501
                  transformations={
-                     'transforms.array.Window': dict(window='soft_tissue'),
-                     'transforms.expand.AddTranforms': dict(
-                        base_transform='transforms.array.Rotate',
-                        value_ranges=dict(angle=(-10., 10.)),
-                        base_config=dict(fill_value=-100.),
-                        n_applications=6)},
+                     'transforms.array.Window': dict(window='soft_tissue')},
                  export_config=dict(
                      include_diagnoses=False,
                      include_rois=True),
-                 loss_function=('keras.losses.BinaryCrossentropy', dict()),
-                 train_metric=('keras.metrics.BinaryAccuracy', dict()),
-                 eval_metrics={
-                     'keras.metrics.BinaryAccuracy': dict(),
-                     'keras.metrics.BinaryCrossentropy': dict()},
+                 loss_function=('nn.BCELoss', dict()),
+                 eval_metrics={'jaccard_score': dict()},
                  model_class='models.unet.UNETModel',
-                 optimizer_class='keras.optimizers.Adam'),
+                 optimizer_class='optim.Adam'),
              scheduler=scheduler,
              stop={"training_iteration": 6},
              num_samples=2,
