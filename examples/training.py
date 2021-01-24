@@ -28,12 +28,12 @@ def get_arguments():
 
 def get_config(args) -> dict:
     scheduler = tune.schedulers.PopulationBasedTraining(
-        time_attr="training_step_count",
-        metric='BinaryAccuracy',
+        time_attr="training_iteration",
+        metric='jaccard_score',
         mode='max',
         perturbation_interval=10,
         hyperparam_mutations={
-            "optimizer_learning_rate": lambda: np.random.uniform(0.001, 1),
+            "optimizer_lr": lambda: np.random.uniform(0.001, 1),
             "model_dropoutrate": lambda: np.random.uniform(0.05, 0.15)},
         quantile_fraction=0.5,
         resample_probability=1.0,
@@ -41,7 +41,7 @@ def get_config(args) -> dict:
         require_attrs=True)
 
     return dict(
-        metric='BinaryAccuracy',
+        metric='jaccard_score',
         mode='max',
         trainable_config=dict(
             train_iterations_per_step=10,
@@ -50,28 +50,22 @@ def get_config(args) -> dict:
             eval_path=os.path.join(args.folder_in, 'eval', '*.zip'),
             train_batch_size=10,
             eval_batch_size=10,
-            shuffle_buffer_size=100,
-            data_keys=['images', 'truth'],
-            padded_shapes={'images': [10, 300, 300, 1], 'truth': [10, 300, 300, 1]},  # noqa 501
             transformations={
                 'transforms.array.Window': dict(window='soft_tissue')},
             export_config=dict(
                 include_diagnoses=False,
                 include_rois=True),
-            loss_function=('keras.losses.BinaryCrossentropy', dict()),
-            train_metric=('keras.metrics.BinaryAccuracy', dict()),
-            eval_metrics={
-                'keras.metrics.BinaryAccuracy': dict(),
-                'keras.metrics.BinaryCrossentropy': dict()},
+            loss_function=('nn.BCELoss', dict()),
+            eval_metrics={'jaccard_score': dict()},
             model_class='models.unet.UNETModel',
-            optimizer_class='keras.optimizers.Adam'),
+            optimizer_class='optim.Adam'),
         scheduler=scheduler,
         stop={"training_iteration": 1000},
-        num_samples=4,
+        num_samples=8,
         reuse_actors=True,
         resources_per_trial=dict(
-            cpu=2,
-            gpu=0.25))
+            cpu=1,
+            gpu=0.125))
 
 
 def main():

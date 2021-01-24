@@ -38,7 +38,6 @@ class TestLTS(unittest.TestCase):
                  eval_path=os.path.join(self.folder_in, 'eval', '*.zip'),
                  train_batch_size=2,
                  eval_batch_size=2,
-                 shuffle_buffer_size=2,
                  transformations={
                      'transforms.array.Window': dict(window='soft_tissue')},
                  export_config=dict(
