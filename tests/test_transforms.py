@@ -34,6 +34,18 @@ class TestArrayTransforms(unittest.TestCase):
             (1, case.export()['images'].shape[1], 60, 80),
             case_new.export()['images'].shape)
 
+    def test_pad(self):
+        case = DicommlCase(**sample_case_config())
+        case_new = transforms.Pad(target_shape=[200, 150])([case])[0]
+        self.assertEqual(
+            (1, case.export()['images'].shape[1], 200, 150),
+            case_new.export()['images'].shape)
+        case = DicommlCase(**sample_case_config())
+        case_new = transforms.Pad(target_shape=[120, 120])([case])[0]
+        self.assertEqual(
+            (1, case.export()['images'].shape[1], 120, 120),
+            case_new.export()['images'].shape)
+
     def test_rotate(self):
         case = DicommlCase(**sample_case_config())
         case_new = transforms.Rotate(angle=10.)([case])[0]

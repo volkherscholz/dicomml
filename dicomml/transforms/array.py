@@ -60,6 +60,29 @@ class Cut(ArrayTransform):
             self.y_range[0]:self.y_range[1]]
 
 
+class Pad(ArrayTransform):
+    """
+    Pad arrays so that they have shape
+    """
+
+    def __init__(self,
+                 target_shape: List[int],
+                 fill_value: float = 0.0,
+                 **kwargs):
+        super(Pad, self).__init__(**kwargs)
+        self.target_shape = target_shape
+        self.fill_value = fill_value
+
+    def _transform_array(self, array):
+        _shape = array.shape
+        _array = self.fill_value * np.ones(self.target_shape)
+        # try to center the array more or less
+        _x = int((self.target_shape[0] - _shape[0]) // 2)
+        _y = int((self.target_shape[1] - _shape[1]) // 2)
+        _array[_x:(_x + _shape[0]), _y:(_y + _shape[1])] = array
+        return _array
+
+
 class Rotate(ArrayTransform):
     """
     Rotate image
