@@ -42,7 +42,7 @@ class TestLTS(unittest.TestCase):
                      'transforms.array.Cut': dict(
                          x_range=[0, 80],
                          y_range=[0, 90]),
-                     'transforms.array.Pad': dict(target_shape=[360, 360]),
+                     'transforms.array.Pad': dict(target_shape=[120, 120]),
                      'transforms.array.Window': dict(window='soft_tissue')},
                  export_config=dict(
                      include_diagnoses=False,
