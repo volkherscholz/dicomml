@@ -39,6 +39,10 @@ class TestLTS(unittest.TestCase):
                  train_batch_size=2,
                  eval_batch_size=2,
                  transformations={
+                     'transforms.array.Cut': dict(
+                         x_range=[0, 80],
+                         y_range=[0, 90]),
+                     'transforms.array.Pad': dict(target_shape=[360, 360]),
                      'transforms.array.Window': dict(window='soft_tissue')},
                  export_config=dict(
                      include_diagnoses=False,

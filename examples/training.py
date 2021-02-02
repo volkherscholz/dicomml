@@ -51,6 +51,10 @@ def get_config(args) -> dict:
             train_batch_size=10,
             eval_batch_size=10,
             transformations={
+                'transforms.array.Cut': dict(
+                    x_range=[0, 300],
+                    y_range=[0, 300]),
+                'transforms.array.Pad': dict(target_shape=[300, 300]),
                 'transforms.array.Window': dict(window='soft_tissue')},
             export_config=dict(
                 include_diagnoses=False,
