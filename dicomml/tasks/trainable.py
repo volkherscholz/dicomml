@@ -171,7 +171,7 @@ class DicommlTrainable(tune.Trainable):
                        eval_metrics: Dict[str, dict],
                        model_class: str,
                        optimizer_class: str,
-                       binaries_predictons: bool = True,
+                       binaries_predictions: bool = True,
                        treshold_value: float = 0.5,
                        **kwargs):
         # setup metrics
@@ -180,7 +180,7 @@ class DicommlTrainable(tune.Trainable):
         self.eval_metrics = {
             key: partial(dicomml_resolve(key, prefix='sklearn.metrics'), **cfg)
             for key, cfg in eval_metrics.items()}
-        self.binaries_predictons = binaries_predictons
+        self.binaries_predictions = binaries_predictions
         self.treshold_value = treshold_value
 
         self.model = dicomml_resolve(model_class)(**{
@@ -217,9 +217,11 @@ class DicommlTrainable(tune.Trainable):
             loss_value_np = loss_value.cpu().numpy()
             truth_np = truth.cpu().numpy()
             predictions_np = predictions.cpu().numpy()
-        if self.binaries_predictons:
+        if self.binaries_predictions:
             predictions_np = np.where(
                 predictions_np > self.treshold_value, 1, 0)
+            truth_np = np.where(
+                truth_np > self.treshold_value, 1, 0)
         return {
             'validation_loss': loss_value_np,
             **{name: metric(truth_np.reshape(-1), predictions_np.reshape(-1))
