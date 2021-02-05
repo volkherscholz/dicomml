@@ -57,13 +57,14 @@ class DicommlTrainable(tune.Trainable):
         # reset metrics
         self.metric_states.reset()
         # training steps
+        _loss_values = []
         for _ in range(self.train_iterations_per_step):
             try:
                 data = next(self.train_dataiter)
             except StopIteration:
                 self.train_dataiter = iter(self.train_dataloader)
                 data = next(self.train_dataiter)
-            self.train_step(**data)
+            _loss_values.append(self.train_step(**data))
         # evaluation steps
         for _ in range(self.eval_iterations_per_step):
             try:
@@ -75,6 +76,7 @@ class DicommlTrainable(tune.Trainable):
         # return evaluation metric results & loss
         return dict(
             epoch=self.iteration,
+            training_loss=max(_loss_values),
             **self.metric_states.result())
 
     def save_checkpoint(self, tmp_checkpoint_dir: str):
@@ -201,6 +203,7 @@ class DicommlTrainable(tune.Trainable):
         loss_value = self.loss(predictions, truth)
         loss_value.backward()
         self.optimizer.step()
+        return loss_value.detach().cpu().numpy()
 
     def eval_step(self,
                   images: torch.Tensor,
