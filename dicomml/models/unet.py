@@ -101,11 +101,15 @@ class UNETUpSampleBlock(UNETConvBlock):
         super(UNETUpSampleBlock, self).__init__(**kwargs)
         self.dropout = slice_distributed(nn.Dropout2d)(p=dropoutrate)
         if sample_three_dimensional:
-            self.upsample_layer = \
-                nn.Upsample(scale_factor=sample_rate, mode='trilinear')
+            self.upsample_layer = nn.Upsample(
+                scale_factor=sample_rate,
+                mode='trilinear',
+                align_corners=False)
         else:
-            self.upsample_layer = slice_distributed(
-                nn.Upsample)(scale_factor=sample_rate, mode='bilinear')
+            self.upsample_layer = slice_distributed(nn.Upsample)(
+                scale_factor=sample_rate,
+                mode='bilinear',
+                align_corners=False)
 
     def forward(self, x, y, **kwargs):
         x = x + self.upsample_layer(y)

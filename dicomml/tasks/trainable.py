@@ -106,7 +106,6 @@ class DicommlTrainable(tune.Trainable):
                    eval_batch_size: int = 10,
                    transformations: Dict[str, dict] = dict(),
                    num_workers: int = 0,
-                   drop_last: bool = False,
                    export_config: dict = dict(),
                    **kwargs):
         class _DicommlDataset(torch.utils.data.Dataset):
@@ -152,8 +151,7 @@ class DicommlTrainable(tune.Trainable):
                 **export_config),
             batch_size=train_batch_size,
             shuffle=True,
-            num_workers=num_workers,
-            drop_last=drop_last)
+            num_workers=num_workers)
         self.train_dataiter = iter(self.train_dataloader)
         self.eval_dataloader = torch.utils.data.DataLoader(
             dataset=_DicommlDataset(
@@ -162,8 +160,7 @@ class DicommlTrainable(tune.Trainable):
                 **export_config),
             batch_size=eval_batch_size,
             shuffle=True,
-            num_workers=0,
-            drop_last=drop_last)
+            num_workers=0)
         self.eval_dataiter = iter(self.eval_dataloader)
 
     def setup_training(self,
