@@ -1,6 +1,56 @@
-from torch import nn, sigmoid
+from torch import nn
 
 from dicomml.models.wrappers import slice_distributed, image_distributed
+
+
+class UNETConv(nn.Module):
+    """
+    Convolution Layer with Relu & Batch Normalization
+    """
+
+    def __init__(self,
+                 n_channels_in: int = 1,
+                 n_channels_out: int = 16,
+                 kernel_size: int = 3,
+                 padding: int = 1,
+                 activation: bool = True,
+                 batch_normalization: bool = True,
+                 conv_three_dimensional: bool = False,
+                 conv_slice_direction: bool = False,
+                 **kwargs):
+        super(UNETConv, self).__init__()
+        self.layers = []
+        if conv_three_dimensional:
+            self.layers.append(nn.Conv3d(
+                in_channels=n_channels_in,
+                out_channels=n_channels_out,
+                kernel_size=kernel_size,
+                padding=padding))
+        else:
+            self.layers.append(slice_distributed(nn.Conv2d)(
+                in_channels=n_channels_in,
+                out_channels=n_channels_out,
+                kernel_size=kernel_size,
+                padding=padding))
+        if batch_normalization:
+            self.layers.append(slice_distributed(nn.BatchNorm2d)(
+                num_features=n_channels_out))
+        if activation:
+            self.layers.append(nn.ReLU())
+        if conv_slice_direction:
+            self.layers.append(image_distributed(nn.Conv1d)(
+                    in_channels=n_channels_out,
+                    out_channels=n_channels_out,
+                    kernel_size=kernel_size,
+                    padding=padding))
+            if activation:
+                self.layers.append(nn.ReLU())
+        self.layers = nn.ModuleList(self.layers)
+
+    def forward(self, x, **kwargs):
+        for layer in self.layers:
+            x = layer(x, **kwargs)
+        return x
 
 
 class UNETConvBlock(nn.Module):
@@ -11,53 +61,19 @@ class UNETConvBlock(nn.Module):
     def __init__(self,
                  n_channels_in: int = 1,
                  n_channels_out: int = 16,
-                 kernel_size: int = 3,
                  depth: int = 2,
-                 activation: bool = True,
-                 batch_normalization: bool = True,
-                 conv_three_dimensional: bool = False,
-                 conv_slice_direction: bool = False,
                  **kwargs):
         super(UNETConvBlock, self).__init__()
-        if conv_three_dimensional:
-            self.layers = [
-                nn.Conv3d(
-                    in_channels=n_channels_in,
-                    out_channels=n_channels_out,
-                    kernel_size=kernel_size,
-                    padding=1)] + [
-                nn.Conv3d(
-                    in_channels=n_channels_out,
-                    out_channels=n_channels_out,
-                    kernel_size=kernel_size,
-                    padding=1)
-                for _ in range(depth - 1)]
-        else:
-            self.layers = [
-                slice_distributed(nn.Conv2d)(
-                    in_channels=n_channels_in,
-                    out_channels=n_channels_out,
-                    kernel_size=kernel_size,
-                    padding=1)] + [
-                slice_distributed(nn.Conv2d)(
-                    in_channels=n_channels_out,
-                    out_channels=n_channels_out,
-                    kernel_size=kernel_size,
-                    padding=1)
-                for _ in range(depth - 1)]
-        if conv_slice_direction:
-            self.layers.append(image_distributed(
-                nn.Conv1d)(
-                    in_channels=n_channels_out,
-                    out_channels=n_channels_out,
-                    kernel_size=kernel_size,
-                    padding=1))
-        if batch_normalization:
-            self.layers.append(
-                slice_distributed(nn.BatchNorm2d)(num_features=n_channels_out))
-        if activation:
-            self.layers.append(nn.ReLU())
-        self.layers = nn.ModuleList(self.layers)
+        self.layers = nn.ModuleList([
+            UNETConv(
+                n_channels_in=n_channels_in,
+                n_channels_out=n_channels_out,
+                **kwargs)] + [
+            UNETConv(
+                n_channels_in=n_channels_out,
+                n_channels_out=n_channels_out,
+                **kwargs)
+            for _ in range(depth - 1)])
 
     def forward(self, x, **kwargs):
         for layer in self.layers:
@@ -150,8 +166,15 @@ class UNETModel(nn.Module):
                 **kwargs) for i in range(block_depth, 0, -1)] + [
             UNETUpSampleBlock(
                 n_channels_in=n_filters,
-                n_channels_out=n_classes,
+                n_channels_out=n_filters,
                 **kwargs)])
+        self.last = UNETConv(
+            n_channels_in=n_filters,
+            n_channels_out=n_classes,
+            kernel_size=1,
+            padding=0,
+            activation=False,
+            batch_normalization=False)
 
     def forward(self, x):
         ys = []
@@ -161,4 +184,4 @@ class UNETModel(nn.Module):
         x = self.middle_layer(x)
         for layer in self.upsampling_blocks:
             x = layer(ys.pop(), x)
-        return sigmoid(x)
+        return self.last(x)

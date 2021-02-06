@@ -4,7 +4,7 @@ from torch import nn, randn
 
 from dicomml.models.wrappers import slice_distributed, image_distributed
 from dicomml.models.unet import \
-    UNETConvBlock, UNETDownSampleBlock, UNETUpSampleBlock, UNETModel
+    UNETConv, UNETConvBlock, UNETDownSampleBlock, UNETUpSampleBlock, UNETModel
 
 
 class TestWrappers(unittest.TestCase):
@@ -20,6 +20,27 @@ class TestWrappers(unittest.TestCase):
         data = randn(5, 1, 10, 120, 120)
         output = layer(data)
         self.assertEqual(output.shape, data.shape)
+
+
+class TestUNETConv(unittest.TestCase):
+
+    def test_call_2d(self):
+        layer = UNETConv()
+        data = randn(5, 1, 10, 120, 120)
+        output = layer(data)
+        self.assertEqual(output.shape[0], data.shape[0])
+
+    def test_call2d1d(self):
+        layer = UNETConv(conv_slice_direction=True)
+        data = randn(5, 1, 10, 120, 120)
+        output = layer(data)
+        self.assertEqual(output.shape[0], data.shape[0])
+
+    def test_call_3d(self):
+        layer = UNETConv(conv_three_dimensional=True)
+        data = randn(5, 1, 10, 120, 120)
+        output = layer(data)
+        self.assertEqual(output.shape[0], data.shape[0])
 
 
 class TestUNETConvBlock(unittest.TestCase):
