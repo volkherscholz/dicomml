@@ -225,7 +225,7 @@ class DicommlTrainable(tune.Trainable):
                   truth: torch.Tensor) -> Dict[str, float]:
         with torch.no_grad():
             images_dev, truth_dev = \
-                images.to(self.device), truth.to(self.device)
+                images.to(self.device), truth.long().to(self.device)
             logits = self.model(images_dev)
             loss_value = self.loss(logits, truth_dev)
             # transform logits
