@@ -171,7 +171,7 @@ class DicommlTrainable(tune.Trainable):
                        eval_metrics: Dict[str, dict],
                        model_class: str,
                        optimizer_class: str,
-                       binaries_predictions: bool = True,
+                       prediction_target: str = 'class',
                        treshold_value: float = 0.5,
                        **kwargs):
         # setup metrics
@@ -180,18 +180,22 @@ class DicommlTrainable(tune.Trainable):
         self.eval_metrics = {
             key: partial(dicomml_resolve(key, prefix='sklearn.metrics'), **cfg)
             for key, cfg in eval_metrics.items()}
-        self.binaries_predictions = binaries_predictions
         self.treshold_value = treshold_value
-
+        # setup model
         self.model = dicomml_resolve(model_class)(**{
             key[6:]: val for key, val in kwargs.items()
             if 'model_' in key})
         self.model.to(self.device)
-
+        # setup optimizer
         self.optimizer = dicomml_resolve(optimizer_class, prefix='torch')(
             self.model.parameters(),
             **{key[10:]: val for key, val in kwargs.items()
                if 'optimizer_' in key})
+        # setup logits transformation layer
+        if prediction_target == 'class':
+            self.logits_layer = torch.nn.Softmax(dim=1)
+        elif prediction_target == 'labels':
+            self.logits_layer = torch.nn.Sigmoid()
 
     def train_step(self,
                    images: torch.Tensor,
