@@ -64,7 +64,8 @@ class DicommlTrainable(tune.Trainable):
             except StopIteration:
                 self.train_dataiter = iter(self.train_dataloader)
                 data = next(self.train_dataiter)
-            _loss_values.append(self.train_step(**data))
+            _loss_val = self.train_step(**data)
+            _loss_values.append(_loss_val)
         # evaluation steps
         for _ in range(self.eval_iterations_per_step):
             try:
@@ -167,15 +168,20 @@ class DicommlTrainable(tune.Trainable):
 
     def setup_training(self,
                        loss_function: Tuple[str, dict],
+                       normalize_layer: Tuple[str, dict],
                        eval_metrics: Dict[str, dict],
                        model_class: str,
                        optimizer_class: str,
+                       model_config: dict = dict(),
                        binaries_predictions: bool = True,
                        treshold_value: float = 0.5,
                        **kwargs):
         # setup metrics
         _class, _config = loss_function
         self.loss = dicomml_resolve(_class, prefix='torch')(**_config)
+        # the normalization layer transforms logits to probabilities
+        _class, _config = normalize_layer
+        self.normalizer = dicomml_resolve(_class, prefix='torch')(**_config)        
         self.eval_metrics = {
             key: partial(dicomml_resolve(key, prefix='sklearn.metrics'), **cfg)
             for key, cfg in eval_metrics.items()}
@@ -183,8 +189,8 @@ class DicommlTrainable(tune.Trainable):
         self.treshold_value = treshold_value
 
         self.model = dicomml_resolve(model_class)(**{
-            key[6:]: val for key, val in kwargs.items()
-            if 'model_' in key})
+            **model_config,
+            **{k[6:]: v for k, v in kwargs.items() if 'model_' in k}})
         self.model.to(self.device)
 
         self.optimizer = dicomml_resolve(optimizer_class, prefix='torch')(
@@ -195,35 +201,40 @@ class DicommlTrainable(tune.Trainable):
     def train_step(self,
                    images: torch.Tensor,
                    truth: torch.Tensor):
-        images, truth = images.to(self.device), truth.to(self.device)
+        images, truth = images.to(self.device), truth.long().to(self.device)
+        # forward + backward + optimize
+        logits = self.model(images)
         # zero gradients
         self.optimizer.zero_grad()
-        # forward + backward + optimize
-        predictions = self.model(images)
-        loss_value = self.loss(predictions, truth)
+        loss_value = self.loss(logits, truth)
         loss_value.backward()
         self.optimizer.step()
-        return loss_value.detach().cpu().numpy()
+        return loss_value.item()
 
     def eval_step(self,
                   images: torch.Tensor,
                   truth: torch.Tensor) -> Dict[str, float]:
         with torch.no_grad():
             images_dev, truth_dev = \
-                images.to(self.device), truth.to(self.device)
-            predictions = self.model(images_dev)
-            loss_value = self.loss(predictions, truth_dev)
+                images.to(self.device), truth.long().to(self.device)
+            logits = self.model(images_dev)
+            loss_value = self.loss(logits, truth_dev)
+            probabilities = self.normalizer(logits).cpu().numpy()
+            truth_np = truth.cpu().numpy()
             # numpy arrays
+
             loss_value_np = loss_value.cpu().numpy()
             truth_np = truth.cpu().numpy()
             predictions_np = predictions.cpu().numpy()
         if self.binaries_predictions:
-            predictions_np = np.where(
+            probabilities = probabilities
+            
+            np.where(
                 predictions_np > self.treshold_value, 1, 0)
             truth_np = np.where(
                 truth_np > self.treshold_value, 1, 0)
         return {
-            'validation_loss': loss_value_np,
+            'validation_loss': loss_value.item(),
             **{name: metric(truth_np.reshape(-1), predictions_np.reshape(-1))
                for name, metric in self.eval_metrics.items()}}
 
