@@ -193,8 +193,16 @@ class DicommlTrainable(tune.Trainable):
         # setup logits transformation layer
         if prediction_target == 'class':
             self.logits_layer = torch.nn.Softmax(dim=1)
+            self.predict = lambda prob: np.argmax(prob, axis=1)
         elif prediction_target == 'labels':
             self.logits_layer = torch.nn.Sigmoid()
+            self.predict = lambda prob: np.where(prob > treshold_value, 0, 1)
+        if prediction_target == 'class_probabilities':
+            self.logits_layer = torch.nn.Softmax(dim=1)
+            self.predict = lambda prob: prob
+        elif prediction_target == 'label_probabilities':
+            self.logits_layer = torch.nn.Sigmoid()
+            self.predict = lambda prob: prob
 
     def train_step(self,
                    images: torch.Tensor,
@@ -203,11 +211,11 @@ class DicommlTrainable(tune.Trainable):
         # zero gradients
         self.optimizer.zero_grad()
         # forward + backward + optimize
-        predictions = self.model(images)
-        loss_value = self.loss(predictions, truth)
+        logits = self.model(images)
+        loss_value = self.loss(logits, truth)
         loss_value.backward()
         self.optimizer.step()
-        return loss_value.detach().cpu().numpy()
+        return loss_value.detach().item()
 
     def eval_step(self,
                   images: torch.Tensor,
@@ -215,20 +223,16 @@ class DicommlTrainable(tune.Trainable):
         with torch.no_grad():
             images_dev, truth_dev = \
                 images.to(self.device), truth.to(self.device)
-            predictions = self.model(images_dev)
-            loss_value = self.loss(predictions, truth_dev)
-            # numpy arrays
-            loss_value_np = loss_value.cpu().numpy()
-            truth_np = truth.cpu().numpy()
-            predictions_np = predictions.cpu().numpy()
-        if self.binaries_predictions:
-            predictions_np = np.where(
-                predictions_np > self.treshold_value, 1, 0)
-            truth_np = np.where(
-                truth_np > self.treshold_value, 1, 0)
+            logits = self.model(images_dev)
+            loss_value = self.loss(logits, truth_dev)
+            # transform logits
+            probabilities = self.logits_layer(logits).cpu().numpy()
+        predictions = self.predict(probabilities)
         return {
-            'validation_loss': loss_value_np,
-            **{name: metric(truth_np.reshape(-1), predictions_np.reshape(-1))
+            'validation_loss': loss_value.item(),
+            **{name: metric(
+                truth.cpu().numpy().reshape(-1),
+                predictions.reshape(-1))
                for name, metric in self.eval_metrics.items()}}
 
     def get_variables(self) -> dict:
