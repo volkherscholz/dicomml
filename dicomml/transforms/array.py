@@ -90,7 +90,7 @@ class Rotate(ArrayTransform):
 
     def __init__(self,
                  angle: float = 0.,
-                 fill_value: float = -1000.,
+                 fill_value: float = 0.0,
                  **kwargs):
         super(Rotate, self).__init__(**kwargs)
         self.angle = angle
