@@ -64,7 +64,8 @@ class DicommlTrainable(tune.Trainable):
             except StopIteration:
                 self.train_dataiter = iter(self.train_dataloader)
                 data = next(self.train_dataiter)
-            _loss_values.append(self.train_step(**data))
+            _loss_val = self.train_step(**data)
+            _loss_values.append(_loss_val)
         # evaluation steps
         for _ in range(self.eval_iterations_per_step):
             try:
@@ -170,6 +171,7 @@ class DicommlTrainable(tune.Trainable):
                        eval_metrics: Dict[str, dict],
                        model_class: str,
                        optimizer_class: str,
+                       model_config: dict = dict(),
                        prediction_target: str = 'class',
                        treshold_value: float = 0.5,
                        **kwargs):
@@ -179,11 +181,10 @@ class DicommlTrainable(tune.Trainable):
         self.eval_metrics = {
             key: partial(dicomml_resolve(key, prefix='sklearn.metrics'), **cfg)
             for key, cfg in eval_metrics.items()}
-        self.treshold_value = treshold_value
         # setup model
         self.model = dicomml_resolve(model_class)(**{
-            key[6:]: val for key, val in kwargs.items()
-            if 'model_' in key})
+            **model_config,
+            **{k[6:]: v for k, v in kwargs.items() if 'model_' in k}})
         self.model.to(self.device)
         # setup optimizer
         self.optimizer = dicomml_resolve(optimizer_class, prefix='torch')(
@@ -207,7 +208,9 @@ class DicommlTrainable(tune.Trainable):
     def train_step(self,
                    images: torch.Tensor,
                    truth: torch.Tensor):
-        images, truth = images.to(self.device), truth.to(self.device)
+        images, truth = images.to(self.device), truth.long().to(self.device)
+        # forward + backward + optimize
+        logits = self.model(images)
         # zero gradients
         self.optimizer.zero_grad()
         # forward + backward + optimize

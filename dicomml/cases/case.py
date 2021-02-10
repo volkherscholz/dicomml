@@ -277,7 +277,7 @@ class DicommlCase:
                 # zero diagnose
                 _diagnose_array.append(np.zeros(len(diagnose_label_set)))
         # convert to numpy arrays
-        _roi_array = np.array(_roi_array).astype(dtype)
+        _roi_array = np.array(_roi_array).round(decimals=1).astype(np.int32)
         _diagnose_array = np.array(_diagnose_array).astype(dtype)
         _image_array = np.array(_image_array).astype(dtype)
         # add to dict
@@ -286,9 +286,9 @@ class DicommlCase:
         if include_rois and include_diagnoses:
             truth = dict(
                 labels=_diagnose_array,
-                rois=np.expand_dims(_roi_array, 0))
+                rois=_roi_array)
         elif include_rois:
-            truth = np.expand_dims(_roi_array, 0)
+            truth = _roi_array
         elif include_diagnoses:
             truth = _diagnose_array
         else:
