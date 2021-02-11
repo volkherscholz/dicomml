@@ -177,6 +177,8 @@ class DicommlTrainable(tune.Trainable):
                        **kwargs):
         # setup metrics
         _class, _config = loss_function
+        if 'weight' in _config.keys():
+            _config['weight'] = torch.Tensor(_config['weight']).to(self.device)
         self.loss = dicomml_resolve(_class, prefix='torch')(**_config)
         self.eval_metrics = {
             key: partial(dicomml_resolve(key, prefix='sklearn.metrics'), **cfg)

@@ -46,6 +46,13 @@ class TestArrayTransforms(unittest.TestCase):
             (1, case.export()['images'].shape[1], 120, 120),
             case_new.export()['images'].shape)
 
+    def test_pool(self):
+        case = DicommlCase(**sample_case_config())
+        case_new = transforms.Pool(method='max', block_size=(2, 2))([case])[0]
+        self.assertEqual(
+            (1, case.export()['images'].shape[1], 60, 60),
+            case_new.export()['images'].shape)
+
     def test_rotate(self):
         case = DicommlCase(**sample_case_config())
         case_new = transforms.Rotate(angle=10.)([case])[0]

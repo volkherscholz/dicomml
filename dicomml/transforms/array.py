@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Tuple
 
 import numpy as np
 from scipy import ndimage
@@ -103,6 +103,34 @@ class Rotate(ArrayTransform):
             reshape=False,
             mode='constant',
             cval=self.fill_value)
+
+
+class Pool(ArrayTransform):
+    """
+    Reduce image size by pooling, e.g. mean or max
+    """
+
+    def __init__(self,
+                 method: str = 'max',
+                 block_size: Tuple[int, int] = (2, 2),
+                 padding_value: float = 0.0,
+                 **kwargs):
+        super(Pool, self).__init__(**kwargs)
+        self.block_size = block_size
+        self.padding_value = padding_value
+        if method == 'max':
+            self.func = np.max
+        elif method == 'mean':
+            self.func = np.mean
+        else:
+            raise ValueError('Method not known')
+
+    def _transform_array(self, array):
+        return measure.block_reduce(
+            array,
+            block_size=self.block_size,
+            func=self.func,
+            cval=self.padding_value)
 
 
 class Window(ArrayTransform):
