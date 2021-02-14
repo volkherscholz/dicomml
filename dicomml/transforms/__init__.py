@@ -62,7 +62,7 @@ class ArrayTransform(DicommlTransform):
                 for key, arr in case.rois.items()}
         else:
             rois = case.rois
-        self.logger.info('Applied transform to case {}'.format(case.caseid))
+        self.logger.debug('Applied transform to case {}'.format(case.caseid))
         return DicommlCase(
             caseid=case.caseid,
             images=images,
