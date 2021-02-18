@@ -42,7 +42,7 @@ class TestLTS(unittest.TestCase):
                      'transforms.array.Cut': dict(
                          x_range=[0, 80],
                          y_range=[0, 90]),
-                     'transforms.array.Pad': dict(target_shape=[120, 120]),
+                     'transforms.array.Pad': dict(target_shape=[128, 128]),
                      'transforms.array.Window': dict(window='soft_tissue')},
                  export_config=dict(
                      include_diagnoses=False,
@@ -50,7 +50,7 @@ class TestLTS(unittest.TestCase):
                  loss_function=('nn.CrossEntropyLoss', dict()),
                  eval_metrics={'jaccard_score': dict()},
                  model_class='models.unet.UNETModel',
-                 model_config=dict(n_classes=2),
+                 model_config=dict(n_classes=2, block_depth=3),
                  optimizer_class='optim.Adam',
                  prediction_target='class'),
              scheduler=scheduler,
