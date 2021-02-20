@@ -113,19 +113,43 @@ class UNETUpSampleBlock(UNETConvBlock):
                  sample_rate: int = 2,
                  dropoutrate: float = 0.1,
                  sample_three_dimensional: bool = False,
+                 upsample_with_conv: bool = False,
+                 n_channels_in: int = 1,
+                 n_channels_out: int = 16,
+                 kernel_size: int = 3,
+                 padding: int = 1,
                  **kwargs):
-        super(UNETUpSampleBlock, self).__init__(**kwargs)
+        super(UNETUpSampleBlock, self).__init__(
+            n_channels_in=n_channels_in,
+            n_channels_out=n_channels_out,
+            kernel_size=kernel_size,
+            padding=padding,
+            **kwargs)
         self.dropout = slice_distributed(nn.Dropout2d)(p=dropoutrate)
-        if sample_three_dimensional:
-            self.upsample_layer = nn.Upsample(
-                scale_factor=sample_rate,
-                mode='trilinear',
-                align_corners=False)
+        if upsample_with_conv:
+            if sample_three_dimensional:
+                self.upsample_layer = nn.ConvTranspose3d(
+                    in_channels=n_channels_in,
+                    out_channels=n_channels_in,
+                    kernel_size=sample_rate,
+                    stride=sample_rate)
+            else:
+                self.upsample_layer = slice_distributed(nn.ConvTranspose2d)(
+                    in_channels=n_channels_in,
+                    out_channels=n_channels_in,
+                    kernel_size=sample_rate,
+                    stride=sample_rate)
         else:
-            self.upsample_layer = slice_distributed(nn.Upsample)(
-                scale_factor=sample_rate,
-                mode='bilinear',
-                align_corners=False)
+            if sample_three_dimensional:
+                self.upsample_layer = nn.Upsample(
+                    scale_factor=sample_rate,
+                    mode='trilinear',
+                    align_corners=False)
+            else:
+                self.upsample_layer = slice_distributed(nn.Upsample)(
+                    scale_factor=sample_rate,
+                    mode='bilinear',
+                    align_corners=False)
 
     def forward(self, x, y, **kwargs):
         x = x + self.upsample_layer(y)

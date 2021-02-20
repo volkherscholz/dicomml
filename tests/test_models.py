@@ -97,11 +97,32 @@ class TestUNETUpSampleBlock(unittest.TestCase):
         output = layer(x, y)
         self.assertEqual(output.shape[0], x.shape[0])
 
+    def test_call_2d_conv_upsample(self):
+        layer = UNETUpSampleBlock(upsample_with_conv=True)
+        x = randn(5, 1, 10, 120, 120)
+        y = randn(5, 1, 10, 60, 60)
+        output = layer(x, y)
+        self.assertEqual(output.shape[0], x.shape[0])
+
+    def test_call_3d_conv_upsample(self):
+        layer = UNETUpSampleBlock(
+            sample_three_dimensional=True, upsample_with_conv=True)
+        x = randn(5, 1, 10, 120, 120)
+        y = randn(5, 1, 5, 60, 60)
+        output = layer(x, y)
+        self.assertEqual(output.shape[0], x.shape[0])
+
 
 class TestUNET(unittest.TestCase):
 
     def test_call_2d(self):
         model = UNETModel()
+        images = randn(5, 1, 10, 120, 120)
+        output = model(images)
+        self.assertEqual(images.shape, output.shape)
+
+    def test_call_2d_conv_upsample(self):
+        model = UNETModel(upsample_with_conv=True)
         images = randn(5, 1, 10, 120, 120)
         output = model(images)
         self.assertEqual(images.shape, output.shape)
