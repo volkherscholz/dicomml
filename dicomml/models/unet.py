@@ -1,3 +1,4 @@
+from typing import Union, List
 from torch import nn, cat
 
 from dicomml.models.wrappers import slice_distributed, image_distributed
@@ -11,8 +12,8 @@ class UNETConv(nn.Module):
     def __init__(self,
                  n_channels_in: int = 1,
                  n_channels_out: int = 16,
-                 kernel_size: int = 3,
-                 padding: int = 1,
+                 kernel_size: Union[int, List[int]] = 3,
+                 padding: Union[int, List[int]] = 1,
                  activation: bool = True,
                  batch_normalization: bool = True,
                  conv_three_dimensional: bool = False,
@@ -87,7 +88,7 @@ class UNETDownSampleBlock(UNETConvBlock):
     """
 
     def __init__(self,
-                 sample_rate: int = 2,
+                 sample_rate: Union[int, List[int]] = 2,
                  dropoutrate: float = 0.1,
                  sample_three_dimensional: bool = False,
                  **kwargs):
@@ -110,14 +111,14 @@ class UNETUpSampleBlock(UNETConvBlock):
     """
 
     def __init__(self,
-                 sample_rate: int = 2,
+                 sample_rate: Union[int, List[int]] = 2,
                  dropoutrate: float = 0.1,
                  sample_three_dimensional: bool = False,
                  upsample_with_conv: bool = False,
                  n_channels_in: int = 1,
                  n_channels_out: int = 16,
-                 kernel_size: int = 3,
-                 padding: int = 1,
+                 kernel_size: Union[int, List[int]] = 3,
+                 padding: Union[int, List[int]] = 1,
                  **kwargs):
         if upsample_with_conv:
             super(UNETUpSampleBlock, self).__init__(
