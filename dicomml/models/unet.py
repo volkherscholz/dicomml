@@ -1,4 +1,4 @@
-from torch import nn
+from torch import nn, cat
 
 from dicomml.models.wrappers import slice_distributed, image_distributed
 
@@ -119,14 +119,15 @@ class UNETUpSampleBlock(UNETConvBlock):
                  kernel_size: int = 3,
                  padding: int = 1,
                  **kwargs):
-        super(UNETUpSampleBlock, self).__init__(
-            n_channels_in=n_channels_in,
-            n_channels_out=n_channels_out,
-            kernel_size=kernel_size,
-            padding=padding,
-            **kwargs)
-        self.dropout = slice_distributed(nn.Dropout2d)(p=dropoutrate)
         if upsample_with_conv:
+            super(UNETUpSampleBlock, self).__init__(
+                n_channels_in=2 * n_channels_in,
+                n_channels_out=n_channels_out,
+                kernel_size=kernel_size,
+                padding=padding,
+                **kwargs)
+            self.dropout = slice_distributed(nn.Dropout2d)(p=dropoutrate)
+            self._combine = lambda x, y: cat([x, y], dim=1)
             if sample_three_dimensional:
                 self.upsample_layer = nn.ConvTranspose3d(
                     in_channels=n_channels_in,
@@ -140,6 +141,14 @@ class UNETUpSampleBlock(UNETConvBlock):
                     kernel_size=sample_rate,
                     stride=sample_rate)
         else:
+            super(UNETUpSampleBlock, self).__init__(
+                n_channels_in=n_channels_in,
+                n_channels_out=n_channels_out,
+                kernel_size=kernel_size,
+                padding=padding,
+                **kwargs)
+            self.dropout = slice_distributed(nn.Dropout2d)(p=dropoutrate)
+            self._combine = lambda x, y: x + y
             if sample_three_dimensional:
                 self.upsample_layer = nn.Upsample(
                     scale_factor=sample_rate,
@@ -152,7 +161,7 @@ class UNETUpSampleBlock(UNETConvBlock):
                     align_corners=False)
 
     def forward(self, x, y, **kwargs):
-        x = x + self.upsample_layer(y)
+        x = self._combine(x, self.upsample_layer(y))
         x = self.dropout(super(UNETUpSampleBlock, self).forward(x))
         return x
 
