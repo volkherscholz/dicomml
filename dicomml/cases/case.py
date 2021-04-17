@@ -230,6 +230,11 @@ class DicommlCase:
                diagnose_label_set: List[str] = [],
                include_rois: bool = True,
                order_images_with_index: bool = True,
+               multiple_classes_from_rois: bool = False,
+               roi_selection: List[str] = [],
+               roi_seperator_string: str = '-',
+               roi_array_max_value: int = 1,
+               rois_overlay_value: int = 1,
                dtype: np.dtype = np.float32,
                ) -> Dict[str, np.ndarray]:
         """
@@ -246,6 +251,8 @@ class DicommlCase:
             include_rois: whether to include the rois
             order_images_with_index: whether to order the images according to
                 their key, i.e. instanceNr before exporting
+            multiple_classes_from_rois: whether to build an array indicating
+                which roi the pixed belongs to, for multiclass prediction
         """
         if order_images_with_index:
             image_keys = sorted(self.images.keys())
@@ -259,10 +266,28 @@ class DicommlCase:
         for imgkey in image_keys:
             _image_array.append(self.images[imgkey])
             if imgkey in self.images_to_rois.keys():
-                _rois = np.array(sum([
-                    self.rois[_key] for _key in self.images_to_rois[imgkey]]))
-                # restict to maximal value of 1 if multiple rois overlay
-                _roi_array.append(np.where(_rois > 1., 1., _rois))
+                _roi_keys = self.images_to_rois[imgkey]
+                if multiple_classes_from_rois:
+                    _rois = []
+                    for _r_key in _roi_keys:
+                        _roi_number = _r_key.split(roi_seperator_string)[-1]
+                        if _roi_number in roi_selection:
+                            _rois.append(
+                                float(_roi_number) * self.rois[_r_key])
+                    if len(_rois) == 0:
+                        _rois = [np.zeros(self.images[imgkey].shape)]
+                else:
+                    _rois = [self.rois[_key] for _key in _roi_keys]
+                _rois = np.sum(np.array(_rois), axis=0)
+                # _rois = np.array(_rois)
+                # return _rois
+                # restict to maximal value of rois_overlay_value
+                # if multiple rois overlay
+                _roi_array.append(
+                    np.where(
+                        _rois > roi_array_max_value,
+                        rois_overlay_value,
+                        _rois))
             else:
                 # zero rois
                 _roi_array.append(np.zeros(self.images[imgkey].shape))
