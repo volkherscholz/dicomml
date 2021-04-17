@@ -225,18 +225,37 @@ class DicommlCase:
             images_to_diagnosis=images_to_diagnosis,
             images_to_rois=images_to_rois)
 
+    def _construct_roi_array(self,
+                             imgkey,
+                             multiple_classes_from_rois: bool = False,
+                             roi_selection: List[str] = [],
+                             roi_seperator_string: str = '-',
+                             roi_array_max_value: int = 1,
+                             rois_overlay_value: int = 1):
+        _roi_keys = self.images_to_rois[imgkey]
+        if multiple_classes_from_rois:
+            _rois = []
+            for _r_key in _roi_keys:
+                _roi_number = _r_key.split(roi_seperator_string)[-1]
+                if _roi_number in roi_selection:
+                    _rois.append(
+                        float(_roi_number) * self.rois[_r_key])
+            if len(_rois) == 0:
+                _rois = [np.zeros(self.images[imgkey].shape)]
+        else:
+            _rois = [self.rois[_key] for _key in _roi_keys]
+        _rois = np.sum(np.array(_rois), axis=0)
+        # restict to maximal value of rois_overlay_value
+        # if multiple rois overlay
+        return np.where(_rois > roi_array_max_value, rois_overlay_value, _rois)
+
     def export(self,
                include_diagnoses: bool = True,
                diagnose_label_set: List[str] = [],
                include_rois: bool = True,
                order_images_with_index: bool = True,
-               multiple_classes_from_rois: bool = False,
-               roi_selection: List[str] = [],
-               roi_seperator_string: str = '-',
-               roi_array_max_value: int = 1,
-               rois_overlay_value: int = 1,
                dtype: np.dtype = np.float32,
-               ) -> Dict[str, np.ndarray]:
+               **kwargs) -> Dict[str, np.ndarray]:
         """
         Exports the case for training or inference as dictionary
         holding arrays with images, rois and one-hot encoded labels
@@ -266,28 +285,7 @@ class DicommlCase:
         for imgkey in image_keys:
             _image_array.append(self.images[imgkey])
             if imgkey in self.images_to_rois.keys():
-                _roi_keys = self.images_to_rois[imgkey]
-                if multiple_classes_from_rois:
-                    _rois = []
-                    for _r_key in _roi_keys:
-                        _roi_number = _r_key.split(roi_seperator_string)[-1]
-                        if _roi_number in roi_selection:
-                            _rois.append(
-                                float(_roi_number) * self.rois[_r_key])
-                    if len(_rois) == 0:
-                        _rois = [np.zeros(self.images[imgkey].shape)]
-                else:
-                    _rois = [self.rois[_key] for _key in _roi_keys]
-                _rois = np.sum(np.array(_rois), axis=0)
-                # _rois = np.array(_rois)
-                # return _rois
-                # restict to maximal value of rois_overlay_value
-                # if multiple rois overlay
-                _roi_array.append(
-                    np.where(
-                        _rois > roi_array_max_value,
-                        rois_overlay_value,
-                        _rois))
+                _roi_array.append(self._construct_roi_array(imgkey, **kwargs))
             else:
                 # zero rois
                 _roi_array.append(np.zeros(self.images[imgkey].shape))
@@ -323,8 +321,8 @@ class DicommlCase:
 
     def iterate(self,
                 add_rois: bool = True,
-                add_labels: bool = True
-                ) -> Iterator[Tuple[str, np.ndarray, str]]:
+                add_labels: bool = True,
+                **kwargs) -> Iterator[Tuple[str, np.ndarray, str]]:
         """
         Return images overlayed with rois (if present)
         and labels (if present)
@@ -335,9 +333,8 @@ class DicommlCase:
                 image_key = next(image_keys)
                 image = self.images[image_key]
                 if image_key in self.images_to_rois.keys() and add_rois:
-                    image = image + np.array(sum([
-                        self.rois[_key]
-                        for _key in self.images_to_rois[image_key]]))
+                    image = image + \
+                        self._construct_roi_array(image_key, **kwargs)
                 if image_key in self.images_to_diagnosis.keys() and add_labels:
                     labels = 'Labels: {}'.format(' '.join([
                         self.diagnose[_key]
