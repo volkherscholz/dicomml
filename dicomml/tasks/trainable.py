@@ -58,6 +58,8 @@ class DicommlTrainable(tune.Trainable):
         self.metric_states.reset()
         # training steps
         _loss_values = []
+        # set model to training mode
+        self.model.train(mode=True)
         for _ in range(self.train_iterations_per_step):
             try:
                 data = next(self.train_dataiter)
@@ -67,6 +69,8 @@ class DicommlTrainable(tune.Trainable):
             _loss_val = self.train_step(**data)
             _loss_values.append(_loss_val)
         # evaluation steps
+        # set model to evaluation mode
+        self.model.train(mode=False)
         for _ in range(self.eval_iterations_per_step):
             try:
                 data = next(self.eval_dataiter)
