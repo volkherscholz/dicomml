@@ -109,7 +109,7 @@ class DicommlCase:
             else:
                 new_obj.images_to_rois.update({imgkey: [roikey]})
         return new_obj
-    
+
     def add_roi_from_nifti(self,
                            filename: str,
                            slice_axis: int = 0,
@@ -427,7 +427,7 @@ class DicommlCase:
             caseid_from_folder_name=False,
             delete_folder=True,
             **kwargs)
-    
+
     @classmethod
     def from_nifti_file(cls, niftifile: str, slice_axis: int = 0, **kwargs):
         """
@@ -481,11 +481,13 @@ class DicommlCase:
                 _arr = _arr.astype(np.int16)
             _arr = _arr + np.int16(intercept)
         return data, _arr
-    
+
     @staticmethod
     def _read_nifti(filename):
         from nibabel import load as nib_load
-        return np.asarray(nib_load(filename).get_fdata(caching='unchanged', dtype=np.float32))
+        return np.asarray(
+            nib_load(filename).get_fdata(
+                caching='unchanged', dtype=np.float32))
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
