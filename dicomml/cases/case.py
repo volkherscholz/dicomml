@@ -11,8 +11,6 @@ from typing import Union, List, Iterator, Tuple, Dict
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from pydicom.filereader import dcmread
-
 
 class DicommlCase:
     """
@@ -106,6 +104,29 @@ class DicommlCase:
                     image_shape=new_obj.images[imgkey].shape,
                     x_coord=roidata[x_coord_column],
                     y_coord=roidata[y_coord_column])})
+            if imgkey in new_obj.images_to_rois.keys():
+                new_obj.images_to_rois[imgkey].append(roikey)
+            else:
+                new_obj.images_to_rois.update({imgkey: [roikey]})
+        return new_obj
+    
+    def add_roi_from_nifti(self,
+                           filename: str,
+                           slice_axis: int = 0,
+                           roinumber: int = 0,
+                           inplace: bool = False) -> 'DicommlCase':
+        _3darr = self._read_nifti(filename)
+        _slices = _3darr.shape[slice_axis]
+        _arrs = np.split(_3darr, _slices, axis=slice_axis)
+
+        if inplace:
+            new_obj = self
+        else:
+            new_obj = self.copy()
+
+        for imgkey, _arr in enumerate(_arrs):
+            roikey = '{}-{}'.format(imgkey, roinumber)
+            new_obj.rois.update({roikey: np.squeeze(_arr, slice_axis)})
             if imgkey in new_obj.images_to_rois.keys():
                 new_obj.images_to_rois[imgkey].append(roikey)
             else:
@@ -384,6 +405,25 @@ class DicommlCase:
             caseid_from_folder_name=False,
             delete_folder=True,
             **kwargs)
+    
+    @classmethod
+    def from_nifti_file(cls, niftifile: str, slice_axis: int = 0, **kwargs):
+        """
+        Create a case from a nifti file
+        Args:
+            niftifile: the filename
+            slice_axis: slicing axis to extract 2D images
+        """
+        _3darr = cls._read_nifti(niftifile)
+        _slices = _3darr.shape[slice_axis]
+        _arrs = np.split(_3darr, _slices, axis=slice_axis)
+        #
+        images = {}
+        for _i, _arr in enumerate(_arrs):
+            images.update({float(_i): np.squeeze(_arr, slice_axis)})
+        return cls(
+            images=images,
+            **kwargs)
 
     @staticmethod
     def _read_dicom(filename, scale_to_hounsfield: bool = True):
@@ -393,6 +433,7 @@ class DicommlCase:
         - scale_to_hounsfield: whether to scale the data
           to hounsfield units
         """
+        from pydicom.filereader import dcmread
         _d = dcmread(filename)
         # extract metadata information
         data = {
@@ -418,6 +459,11 @@ class DicommlCase:
                 _arr = _arr.astype(np.int16)
             _arr = _arr + np.int16(intercept)
         return data, _arr
+    
+    @staticmethod
+    def _read_nifti(filename):
+        from nibabel import load as nib_load
+        return np.asarray(nib_load(filename).get_fdata(caching='unchanged', dtype=np.float32))
 
     def __eq__(self, other):
         if not isinstance(other, type(self)):
