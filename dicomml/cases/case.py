@@ -321,6 +321,8 @@ class DicommlCase:
                 # zero diagnose
                 _diagnose_array.append(np.zeros(len(diagnose_label_set)))
         # convert to numpy arrays
+        # ensure that labels are always positive semi-definite integer values
+        _roi_array = np.where(_roi_array < 0.0, 0.0, _roi_array)
         _roi_array = np.array(_roi_array).round(decimals=1).astype(np.int32)
         _diagnose_array = np.array(_diagnose_array).astype(dtype)
         _image_array = np.array(_image_array).astype(dtype)
